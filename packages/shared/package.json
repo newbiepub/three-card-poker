@@ -1,0 +1,22 @@
+{
+  "name": "@three-card-poker/shared",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "type-check": "bunx tsc --noEmit"
+  },
+  "exports": {
+    ".": "./index.ts",
+    "./types": "./src/types/index.ts",
+    "./constants": "./src/constants/index.ts",
+    "./utils": "./src/utils/index.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}

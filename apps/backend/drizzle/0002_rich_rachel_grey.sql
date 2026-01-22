@@ -1,0 +1,1 @@
+ALTER TABLE `session_scores` ADD `cards` text;

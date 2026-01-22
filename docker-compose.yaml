@@ -1,0 +1,19 @@
+services:
+  backend:
+    build:
+      context: .
+      target: backend
+    ports:
+      - "3001:3001"
+
+  nginx:
+    build:
+      context: .
+      target: nginx
+    ports:
+      - "88:88"
+    depends_on:
+      - backend
+
+volumes:
+  poker-data:

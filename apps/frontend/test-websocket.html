@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+</head>
+<body>
+    <h1>WebSocket Test</h1>
+    <div id="messages"></div>
+    
+    <script>
+        const ws = new WebSocket('ws://localhost:3001/ws?roomCode=TEST&playerId=test-player');
+        
+        ws.onopen = () => {
+            console.log('Connected!');
+            addMessage('Connected to WebSocket');
+            
+            // Send test message
+            ws.send(JSON.stringify({
+                type: 'joinRoom',
+                roomCode: 'TEST',
+                playerId: 'test-player'
+            }));
+        };
+        
+        ws.onmessage = (event) => {
+            console.log('Received:', event.data);
+            addMessage('Received: ' + event.data);
+        };
+        
+        ws.onerror = (error) => {
+            console.error('Error:', error);
+            addMessage('Error: ' + error);
+        };
+        
+        ws.onclose = (event) => {
+            console.log('Closed:', event.code, event.reason);
+            addMessage('Closed: ' + event.code + ' - ' + event.reason);
+        };
+        
+        function addMessage(text) {
+            const div = document.createElement('div');
+            div.textContent = new Date().toISOString() + ' - ' + text;
+            document.getElementById('messages').appendChild(div);
+        }
+    </script>
+</body>
+</html>

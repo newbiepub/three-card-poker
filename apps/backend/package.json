@@ -1,0 +1,31 @@
+{
+  "name": "@three-card-poker/backend",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun --watch index.ts",
+    "build": "bun build index.ts --outdir dist --target bun",
+    "start": "bun dist/index.js",
+    "clean": "rm -rf dist",
+    "lint": "bunx eslint .",
+    "type-check": "bunx tsc --noEmit",
+    "db:generate": "bunx drizzle-kit generate",
+    "db:migrate": "bun run src/db/migrate.ts",
+    "db:studio": "bunx drizzle-kit studio"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^22.9.0",
+    "drizzle-kit": "^0.31.8",
+    "typescript": "^5"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.1",
+    "hono": "^4.11.4",
+    "@three-card-poker/shared": "workspace:*"
+  }
+}

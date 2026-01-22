@@ -1,0 +1,225 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --font-heading: "Russo One", sans-serif;
+  --font-body: "Chakra Petch", sans-serif;
+}
+
+:root {
+  --radius: 0.625rem;
+  /* Retro-Futurism Gaming Colors */
+  --background: #F8FAFC;
+  --foreground: #1E293B;
+  --card: #F8FAFC;
+  --card-foreground: #1E293B;
+  --popover: #F8FAFC;
+  --popover-foreground: #1E293B;
+  --primary: #2563EB;
+  --primary-foreground: #F8FAFC;
+  --secondary: #3B82F6;
+  --secondary-foreground: #1E293B;
+  --muted: #E2E8F0;
+  --muted-foreground: #64748B;
+  --accent: #F97316;
+  --accent-foreground: #F8FAFC;
+  --destructive: #DC2626;
+  --border: #E2E8F0;
+  --input: #E2E8F0;
+  --ring: #2563EB;
+  --chart-1: #2563EB;
+  --chart-2: #3B82F6;
+  --chart-3: #F97316;
+  --chart-4: #F8FAFC;
+  --chart-5: #1E293B;
+}
+
+.dark {
+  --background: #0F172A;
+  --foreground: #F8FAFC;
+  --card: #1E293B;
+  --card-foreground: #F8FAFC;
+  --popover: #1E293B;
+  --popover-foreground: #F8FAFC;
+  --primary: #3B82F6;
+  --primary-foreground: #0F172A;
+  --secondary: #2563EB;
+  --secondary-foreground: #F8FAFC;
+  --muted: #1E293B;
+  --muted-foreground: #94A3B8;
+  --accent: #F97316;
+  --accent-foreground: #0F172A;
+  --destructive: #EF4444;
+  --border: #334155;
+  --input: #334155;
+  --ring: #3B82F6;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-body;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
+  }
+}
+
+/* Retro-Futurism Effects */
+@keyframes glitch {
+  0%, 100% {
+    transform: translate(0);
+  }
+  20% {
+    transform: translate(-2px, 2px);
+  }
+  40% {
+    transform: translate(-2px, -2px);
+  }
+  60% {
+    transform: translate(2px, 2px);
+  }
+  80% {
+    transform: translate(2px, -2px);
+  }
+}
+
+@keyframes neon-glow {
+  0%, 100% {
+    text-shadow: 
+      0 0 10px #2563EB,
+      0 0 20px #2563EB,
+      0 0 30px #2563EB,
+      0 0 40px #2563EB;
+  }
+  50% {
+    text-shadow: 
+      0 0 20px #3B82F6,
+      0 0 30px #3B82F6,
+      0 0 40px #3B82F6,
+      0 0 50px #3B82F6;
+  }
+}
+
+.neon-text {
+  animation: neon-glow 2s ease-in-out infinite;
+}
+
+.crt-scanlines::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    transparent 50%,
+    rgba(0, 0, 0, 0.03) 50%
+  );
+  background-size: 100% 4px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Retro-Futurism Gaming Utilities */
+@layer utilities {
+  .gaming-gradient-text {
+    background: linear-gradient(45deg, #2563EB, #F97316);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  
+  .gaming-button {
+    @apply font-heading text-lg font-bold tracking-wide transition-all duration-300 hover:scale-105;
+    background: linear-gradient(45deg, #F97316, #FB923C);
+    box-shadow: 0 4px 14px 0 rgba(249, 115, 22, 0.3);
+  }
+  
+  .glass-card {
+    background: linear-gradient(135deg, rgba(248, 250, 252, 0.95) 0%, rgba(241, 245, 249, 0.95) 100%);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(37, 99, 235, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+  
+  .glass-card-dark {
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.95) 100%);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(37, 99, 235, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+  
+  .neon-border {
+    box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.5), 0 0 20px rgba(37, 99, 235, 0.3);
+  }
+  
+  .neon-border-orange {
+    box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.5), 0 0 20px rgba(249, 115, 22, 0.3);
+  }
+  
+  /* Enhanced animations for title */
+  @keyframes text-glow {
+    0%, 100% {
+      filter: drop-shadow(0 0 30px rgba(37, 99, 235, 0.5)) drop-shadow(0 0 60px rgba(249, 115, 22, 0.3));
+      transform: scale(1);
+    }
+    50% {
+      filter: drop-shadow(0 0 40px rgba(37, 99, 235, 0.8)) drop-shadow(0 0 80px rgba(249, 115, 22, 0.5));
+      transform: scale(1.02);
+    }
+  }
+  
+  @keyframes slide-in {
+    0% {
+      transform: translateX(-100%) scaleX(0);
+      opacity: 0;
+    }
+    50% {
+      transform: translateX(0) scaleX(1);
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(100%) scaleX(0);
+      opacity: 0;
+    }
+  }
+}
