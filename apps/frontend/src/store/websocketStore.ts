@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { useRoomStore } from "./roomStore";
 import { useGameStore } from "./gameStore";
-import type { Player, Room, Session } from "@/types";
+import type { Room, Session } from "@/types";
+import type { Player } from "@three-card-poker/shared";
 
 interface WebSocketState {
   ws: WebSocket | null;

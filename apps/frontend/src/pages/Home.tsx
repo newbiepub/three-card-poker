@@ -1,32 +1,47 @@
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { NameEntryModal } from '@/components/player/NameEntryModal';
-import { RoomCodeInput } from '@/components/room/RoomCodeInput';
-import { Crown, Users, Play, ArrowRight } from 'lucide-react';
-import { useRegisterPlayer } from '@/api/players';
-import { useCreateRoom, useJoinRoom } from '@/api/rooms';
-import { usePlayerStore, useWebSocketStore } from '@/store';
-import { useNavigate } from 'react-router-dom';
+import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { NameEntryModal } from "@/components/player/NameEntryModal";
+import { RoomCodeInput } from "@/components/room/RoomCodeInput";
+import { Crown, Users, Play, ArrowRight } from "lucide-react";
+import { useRegisterPlayer } from "@/api/players";
+import { useCreateRoom, useJoinRoom } from "@/api/rooms";
+import { usePlayerStore, useWebSocketStore } from "@/store";
+import { useNavigate } from "react-router-dom";
 
 export function Home() {
   const [showNameModal, setShowNameModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
-  const [roomName, setRoomName] = useState('');
-  const [totalRounds, setTotalRounds] = useState('10');
-  const [joinError, setJoinError] = useState('');
-  
-  const { player, isAuthenticated, setPlayer: setPlayerInStore, logout } = usePlayerStore();
+  const [roomName, setRoomName] = useState("");
+  const [totalRounds, setTotalRounds] = useState("10");
+  const [joinError, setJoinError] = useState("");
+
+  const {
+    player,
+    isAuthenticated,
+    setPlayer: setPlayerInStore,
+    logout,
+  } = usePlayerStore();
   const { disconnect } = useWebSocketStore();
   const registerPlayerMutation = useRegisterPlayer();
   const createRoomMutation = useCreateRoom();
   const joinRoomMutation = useJoinRoom();
   const navigate = useNavigate();
-  
-  const isLoading = registerPlayerMutation.isPending || createRoomMutation.isPending || joinRoomMutation.isPending;
+
+  const isLoading =
+    registerPlayerMutation.isPending ||
+    createRoomMutation.isPending ||
+    joinRoomMutation.isPending;
 
   // Check for existing player on mount
   useEffect(() => {
@@ -41,51 +56,58 @@ export function Home() {
       setPlayerInStore(result.player);
       setShowNameModal(false);
     } catch (error) {
-      console.error('Failed to register player:', error);
+      console.error("Failed to register player:", error);
     }
   };
 
   const handleCreateRoom = async () => {
     if (!player) return;
-    
+
     try {
       const result = await createRoomMutation.mutateAsync({
         hostName: player.name,
         roomName: roomName || `${player.name}'s Room`,
         totalRounds: parseInt(totalRounds),
       });
-      
-      localStorage.setItem('current-room', JSON.stringify({
-        room: result.room,
-        session: result.session,
-        isHost: true,
-      }));
-      
+
+      localStorage.setItem(
+        "current-room",
+        JSON.stringify({
+          room: result.room,
+          session: result.session,
+          isHost: true,
+        }),
+      );
+
       navigate(`/room/${result.room.roomCode}`);
     } catch (error) {
-      console.error('Failed to create room:', error);
+      console.error("Failed to create room:", error);
     }
   };
 
   const handleJoinRoom = async (code: string) => {
     if (!player) return;
-    
+
     try {
       const result = await joinRoomMutation.mutateAsync({
         roomCode: code,
         playerName: player.name,
       });
-      
-      localStorage.setItem('current-room', JSON.stringify({
-        room: result.room,
-        session: result.session,
-        isHost: result.isHost,
-      }));
-      
+
+      localStorage.setItem(
+        "current-room",
+        JSON.stringify({
+          room: result.room,
+          session: result.session,
+          isHost: result.isHost,
+        }),
+      );
+
       navigate(`/room/${code}`);
       setShowJoinModal(false);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to join room';
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to join room";
       setJoinError(errorMessage);
     }
   };
@@ -94,54 +116,36 @@ export function Home() {
     <div className="min-h-screen bg-background crt-scanlines">
       {/* Hero Section */}
       <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-linear-to-br from-primary/20 via-transparent to-accent/20" />
-        <div className="relative container mx-auto px-4 py-16">
-          <div className="text-center space-y-6">
-            <div className="relative inline-block">
-              {/* Glow effect behind text */}
-              <div 
-                className="absolute inset-0 blur-3xl opacity-50"
-                style={{
-                  background: 'linear-gradient(45deg, #2563EB, #3B82F6, #F97316)',
-                  transform: 'scale(1.2)',
-                }}
-              />
-              
-              <h1 
-                className="relative font-heading text-6xl md:text-8xl font-black tracking-wide"
-                style={{
-                  background: 'linear-gradient(135deg, #1E40AF 0%, #2563EB 25%, #3B82F6 50%, #F97316 75%, #DC2626 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  backgroundClip: 'text',
-                  filter: 'drop-shadow(0 0 30px rgba(37, 99, 235, 0.5)) drop-shadow(0 0 60px rgba(249, 115, 22, 0.3))',
-                  textShadow: '0 0 80px rgba(37, 99, 235, 0.5), 0 0 120px rgba(249, 115, 22, 0.3)',
-                  animation: 'text-glow 3s ease-in-out infinite',
-                }}
+        <div className="absolute inset-0 bg-linear-to-br from-primary/10 via-transparent to-accent/10" />
+        <div className="relative container mx-auto px-4 py-24">
+          <div className="text-center space-y-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+            >
+              <h1 className="hero-title">Three Card Poker</h1>
+
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4, duration: 0.8 }}
+                className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto font-body mt-6"
               >
-                Three Card Poker
-              </h1>
-              
-              {/* Animated underline */}
-              <div 
-                className="absolute -bottom-2 left-0 right-0 h-1 rounded-full"
-                style={{
-                  background: 'linear-gradient(90deg, transparent, #2563EB, #F97316, transparent)',
-                  animation: 'slide-in 2s ease-out infinite',
-                }}
-              />
-            </div>
-            <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto font-body">
-              Experience the thrill of online multiplayer poker with friends.
-              Create rooms, join games, and compete in exciting card matches!
-            </p>
+                Experience the thrill of online multiplayer poker with friends.
+                Create rooms, join games, and compete in exciting card matches!
+              </motion.p>
+            </motion.div>
             {isAuthenticated && player && (
               <div className="flex items-center justify-center gap-4">
-                <Badge variant="secondary" className="text-lg py-2 px-4 font-body">
+                <Badge
+                  variant="secondary"
+                  className="text-lg py-2 px-4 font-body"
+                >
                   Welcome back, {player.name}!
                 </Badge>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   onClick={() => {
                     disconnect();
                     logout();
@@ -172,17 +176,21 @@ export function Home() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="roomName" className="font-body">Room Name (Optional)</Label>
+                <Label htmlFor="roomName" className="font-body">
+                  Room Name (Optional)
+                </Label>
                 <Input
                   id="roomName"
-                  placeholder={`${player?.name || 'Host'}'s Room`}
+                  placeholder={`${player?.name || "Host"}'s Room`}
                   value={roomName}
                   onChange={(e) => setRoomName(e.target.value)}
                   className="font-body"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="rounds" className="font-body">Number of Rounds</Label>
+                <Label htmlFor="rounds" className="font-body">
+                  Number of Rounds
+                </Label>
                 <select
                   id="rounds"
                   value={totalRounds}
@@ -195,12 +203,12 @@ export function Home() {
                   <option value="20">20 Rounds</option>
                 </select>
               </div>
-              <Button 
+              <Button
                 onClick={handleCreateRoom}
                 disabled={!player || isLoading}
                 className="w-full gaming-button"
               >
-                {isLoading ? 'Creating...' : 'Create Room'}
+                {isLoading ? "Creating..." : "Create Room"}
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </CardContent>
@@ -220,13 +228,15 @@ export function Home() {
             <CardContent className="space-y-4">
               <div className="text-center py-8">
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
-                  <span className="text-2xl font-mono font-bold text-primary">000000</span>
+                  <span className="text-2xl font-mono font-bold text-primary">
+                    000000
+                  </span>
                 </div>
                 <p className="text-muted-foreground font-body">
                   Ask the room host for the code
                 </p>
               </div>
-              <Button 
+              <Button
                 onClick={() => setShowJoinModal(true)}
                 disabled={!player}
                 className="w-full gaming-button"
@@ -240,7 +250,7 @@ export function Home() {
 
         {/* Features Section */}
         <div className="mt-20 text-center">
-          <h2 className="font-heading text-3xl mb-8 neon-text">Game Features</h2>
+          <h2 className="font-heading text-3xl mb-8">Game Features</h2>
           <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
             <div className="space-y-2">
               <div className="text-4xl mb-4">🎴</div>
@@ -273,7 +283,7 @@ export function Home() {
         onSubmit={handlePlayerRegister}
         isLoading={registerPlayerMutation.isPending}
       />
-      
+
       <RoomCodeInput
         isOpen={showJoinModal}
         onJoin={handleJoinRoom}

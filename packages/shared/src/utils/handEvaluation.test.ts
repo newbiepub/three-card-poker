@@ -32,7 +32,7 @@ function card(rank: string, suit: string): Card {
   return {
     rank: rank as Card["rank"],
     suit: suit as Card["suit"],
-    value: values[rank],
+    value: values[rank] ?? 0,
   };
 }
 
@@ -65,14 +65,14 @@ describe("isTriple", () => {
 });
 
 describe("isBaTien", () => {
-  test("should return true for three different face cards", () => {
-    expect(isBaTien([card("J", "♥"), card("Q", "♦"), card("K", "♠")])).toBe(
+  test("should return true for three face cards (not triple or straight)", () => {
+    expect(isBaTien([card("J", "♥"), card("J", "♦"), card("K", "♠")])).toBe(
       true,
     );
-    expect(isBaTien([card("K", "♠"), card("J", "♣"), card("Q", "♥")])).toBe(
+    expect(isBaTien([card("K", "♠"), card("Q", "♣"), card("Q", "♥")])).toBe(
       true,
     );
-    expect(isBaTien([card("J", "♥"), card("K", "♦"), card("Q", "♣")])).toBe(
+    expect(isBaTien([card("J", "♥"), card("K", "♦"), card("K", "♣")])).toBe(
       true,
     );
   });
@@ -128,13 +128,19 @@ describe("getHandType", () => {
       getHandType([card("K", "♥"), card("K", "♦"), card("K", "♠")]),
     ).toBe("triple");
     expect(
-      getHandType([card("J", "♥"), card("Q", "♦"), card("K", "♠")]),
+      getHandType([card("J", "♥"), card("J", "♦"), card("K", "♠")]),
     ).toBe("baTien");
     expect(
       getHandType([card("K", "♥"), card("K", "♦"), card("5", "♠")]),
     ).toBe("pair");
     expect(
       getHandType([card("2", "♥"), card("5", "♦"), card("8", "♠")]),
+    ).toBe("normal");
+    expect(
+      getHandType([card("Q", "♥"), card("K", "♦"), card("A", "♠")]),
+    ).toBe("straight");
+    expect(
+      getHandType([card("A", "♥"), card("2", "♦"), card("3", "♠")]),
     ).toBe("normal");
   });
 });
@@ -147,14 +153,14 @@ describe("evaluateHand", () => {
       card("K", "♠"),
     ]);
     expect(result.type).toBe("triple");
-    expect(result.score).toBe(13); // K = 13 in RANK_ORDER
+    expect(result.score).toBe(0); // K+K+K = 0+0+0 = 0 mod 10
     expect(result.tripleRank).toBe("K");
   });
 
   test("should evaluate ba tien correctly", () => {
     const result = evaluateHand([
       card("J", "♥"),
-      card("Q", "♦"),
+      card("J", "♦"),
       card("K", "♠"),
     ]);
     expect(result.type).toBe("baTien");
@@ -168,7 +174,7 @@ describe("evaluateHand", () => {
       card("3", "♠"),
     ]);
     expect(result.type).toBe("pair");
-    expect(result.score).toBe(7); // 7 = 7 in RANK_ORDER
+    expect(result.score).toBe(7); // 7+7+3 = 17 mod 10 = 7
     expect(result.pairRank).toBe("7");
     expect(result.kicker?.rank).toBe("3");
   });
@@ -282,6 +288,13 @@ describe("compareHands", () => {
 
     expect(compareHands(tripleK, triple2)).toBe(1);
     expect(compareHands(triple2, tripleK)).toBe(-1);
+
+    const tripleA = evaluateHand([
+      card("A", "♥"),
+      card("A", "♦"),
+      card("A", "♠"),
+    ]);
+    expect(compareHands(tripleA, tripleK)).toBe(1);
   });
 
   test("higher normal score wins", () => {
@@ -298,6 +311,38 @@ describe("compareHands", () => {
 
     expect(compareHands(score9, score5)).toBe(1);
     expect(compareHands(score5, score9)).toBe(-1);
+  });
+
+  test("higher card rank wins when scores are equal", () => {
+    // Q (rank 12) vs 10 (rank 10) in a 5-point tie
+    const handWithQ = evaluateHand([
+      card("Q", "♦"),
+      card("8", "♠"),
+      card("7", "♦"),
+    ]); // 0+8+7 = 15 -> 5 pts
+    const handWith10 = evaluateHand([
+      card("10", "♥"),
+      card("8", "♦"),
+      card("7", "♥"),
+    ]); // 0+8+7 = 15 -> 5 pts
+
+    expect(compareHands(handWithQ, handWith10)).toBe(1);
+    expect(compareHands(handWith10, handWithQ)).toBe(-1);
+
+    // A (rank 14) vs K (rank 13) in a 5-point tie
+    const handWithA = evaluateHand([
+      card("A", "♥"),
+      card("8", "♦"),
+      card("6", "♥"),
+    ]); // 1+8+6 = 15 -> 5 pts
+    const handWithK = evaluateHand([
+      card("K", "♦"),
+      card("8", "♠"),
+      card("7", "♦"),
+    ]); // 0+8+7 = 15 -> 5 pts
+
+    expect(compareHands(handWithA, handWithK)).toBe(1);
+    expect(compareHands(handWithK, handWithA)).toBe(-1);
   });
 });
 

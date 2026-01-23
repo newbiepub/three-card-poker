@@ -45,7 +45,6 @@ export const SUIT_ORDER: Record<Suit, number> = {
 
 // Rank order for comparing card values (A < 2 < ... < 10 < J < Q < K)
 export const RANK_ORDER: Record<Rank, number> = {
-  A: 1,
   "2": 2,
   "3": 3,
   "4": 4,
@@ -58,6 +57,7 @@ export const RANK_ORDER: Record<Rank, number> = {
   J: 11,
   Q: 12,
   K: 13,
+  A: 14,
 };
 
 // Face cards for Ba Tiên detection

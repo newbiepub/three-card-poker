@@ -1,22 +1,24 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Trophy, Eye, EyeOff, Users } from "lucide-react";
-import type { Card as CardType } from "@three-card-poker/shared";
-import {
-  useGameStore,
-  usePlayerStore,
-  useWebSocketStore,
-  useRoomStore,
-} from "@/store";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   useDrawCard,
   usePublishScore,
-  useUpdateSessionRound,
   useSessionState,
+  useUpdateSessionRound,
 } from "@/api/sessions";
 import { RoundResultModal } from "@/components/RoundResultModal";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  useGameStore,
+  usePlayerStore,
+  useRoomStore,
+  useWebSocketStore,
+} from "@/store";
+import type { Card as CardType } from "@three-card-poker/shared";
+import { determineWinner, evaluateHand } from "@three-card-poker/shared";
+import { Eye, EyeOff, Trophy, Users } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 export const MultiplayerGameBoard: React.FC = () => {
   const { player } = usePlayerStore();
@@ -123,14 +125,6 @@ export const MultiplayerGameBoard: React.FC = () => {
 
   useEffect(() => {
     if (sessionState && playersRef.current.length > 0) {
-      const cumulatedScore = sessionState.allScores.reduce(
-        (acc, score) => {
-          acc[score.playerId] = (acc[score.playerId] || 0) + score.pointsChange;
-          return acc;
-        },
-        {} as Record<string, number>,
-      );
-
       syncPlayerScoresRef.current(
         sessionState.scores.map((score) => ({
           playerId: score.playerId,
@@ -142,9 +136,9 @@ export const MultiplayerGameBoard: React.FC = () => {
       );
 
       syncPlayerCumulativeScores(
-        Object.entries(cumulatedScore).map(([playerId, score]) => ({
-          playerId,
-          cumulatedScore: score,
+        sessionState.allScores.map((score) => ({
+          playerId: score.playerId,
+          cumulatedScore: score.cumulativeScore,
         })),
       );
     }
@@ -163,10 +157,30 @@ export const MultiplayerGameBoard: React.FC = () => {
       !showRoundResult &&
       players.length > 0
     ) {
-      const winner = players.reduce((prev, current) =>
-        (current.score || 0) > (prev.score || 0) ? current : prev,
-      );
-      setRoundWinner(winner);
+      // Find winner based on pointsChange from backend
+      const winnerByPoints = players.find((p) => (p.roundScore || 0) > 0);
+      if (winnerByPoints) {
+        setRoundWinner(winnerByPoints);
+      } else {
+        // Fallback: Perform proper hand evaluation on frontend to show correct winner immediately
+        const playersWithHands = players.filter(
+          (p) => p.hand && p.hand.length === 3,
+        );
+        if (playersWithHands.length > 0) {
+          const handResults = playersWithHands.map((p) => evaluateHand(p.hand));
+          const winnerIndex = determineWinner(handResults);
+
+          const fallbackWinner =
+            playersWithHands[winnerIndex] || playersWithHands[0];
+          setRoundWinner(fallbackWinner);
+        } else {
+          // Absolute fallback
+          const fallbackWinner = players.reduce((prev, current) =>
+            (prev.score || 0) > (current.score || 0) ? prev : current,
+          );
+          setRoundWinner(fallbackWinner);
+        }
+      }
     }
   }, [
     allPlayersPublished,
@@ -299,9 +313,10 @@ export const MultiplayerGameBoard: React.FC = () => {
       setPlayerScore(null);
       setShowScore(false);
 
-      const response = (await updateRoundMutation.mutateAsync(session.id)) as
-        | { session?: { currentRound?: number } }
-        | undefined;
+      const response = (await updateRoundMutation.mutateAsync({
+        sessionId: session.id,
+        expectedCurrentRound: currentRound,
+      })) as { session?: { currentRound?: number } } | undefined;
       const nextRoundNumber =
         response?.session?.currentRound ?? currentRound + 1;
 
@@ -330,51 +345,89 @@ export const MultiplayerGameBoard: React.FC = () => {
   };
 
   const handleViewRoundResult = () => {
-    const winner = players.reduce((prev, current) =>
-      (current.score || 0) > (prev.score || 0) ? current : prev,
-    );
-    setRoundWinner(winner);
+    // Find winner based on pointsChange from backend
+    const winnerByPoints = players.find((p) => (p.roundScore || 0) > 0);
+    if (winnerByPoints) {
+      setRoundWinner(winnerByPoints);
+    } else {
+      // Fallback: Perform proper hand evaluation
+      const playersWithHands = players.filter(
+        (p) => p.hand && p.hand.length === 3,
+      );
+      if (playersWithHands.length > 0) {
+        const handResults = playersWithHands.map((p) => evaluateHand(p.hand));
+        const winnerIndex = determineWinner(handResults);
+
+        const fallbackWinner =
+          playersWithHands[winnerIndex] || playersWithHands[0];
+        setRoundWinner(fallbackWinner);
+      } else {
+        const fallbackWinner = players.reduce((prev, current) =>
+          (prev.score || 0) > (current.score || 0) ? prev : current,
+        );
+        setRoundWinner(fallbackWinner);
+      }
+    }
     setShowRoundResult(true);
   };
 
   if (showFinalResult && gameWinner) {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <Card className="w-full max-w-2xl p-8 shadow-lg">
-          <div className="text-center">
-            <Trophy className="w-16 h-16 mx-auto mb-4 text-yellow-500" />
-            <h2 className="text-3xl font-bold font-heading mb-6">Game Over!</h2>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-2xl"
+        >
+          <Card className="p-8 shadow-lg">
+            <div className="text-center">
+              <motion.div
+                initial={{ rotate: -10, scale: 0.8 }}
+                animate={{ rotate: 0, scale: 1 }}
+                transition={{ type: "spring", stiffness: 200 }}
+              >
+                <Trophy className="w-16 h-16 mx-auto mb-4 text-yellow-500" />
+              </motion.div>
+              <h2 className="text-3xl font-bold font-heading mb-6">
+                Game Over!
+              </h2>
 
-            <div className="space-y-2 mb-8">
-              <h3 className="text-lg font-semibold mb-4">Final Scores</h3>
-              {players
-                .sort((a, b) => b.cumulatedScore - a.cumulatedScore)
-                .map((p, index) => (
-                  <div
-                    key={p.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-secondary"
-                  >
-                    <div className="flex items-center gap-3">
-                      {index === 0 && (
-                        <Trophy className="w-5 h-5 text-yellow-500" />
-                      )}
-                      <span className="font-medium">{p.name}</span>
-                    </div>
-                    <Badge variant="outline" className="font-mono">
-                      {p.cumulatedScore} pts
-                    </Badge>
-                  </div>
-                ))}
+              <div className="space-y-2 mb-8">
+                <h3 className="text-lg font-semibold mb-4">Final Scores</h3>
+                <div className="space-y-2">
+                  {players
+                    .sort((a, b) => b.cumulatedScore - a.cumulatedScore)
+                    .map((p, index) => (
+                      <motion.div
+                        key={p.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        className="flex items-center justify-between p-3 rounded-lg bg-secondary"
+                      >
+                        <div className="flex items-center gap-3">
+                          {index === 0 && (
+                            <Trophy className="w-5 h-5 text-yellow-500" />
+                          )}
+                          <span className="font-medium">{p.name}</span>
+                        </div>
+                        <Badge variant="outline" className="font-mono">
+                          {p.cumulatedScore} pts
+                        </Badge>
+                      </motion.div>
+                    ))}
+                </div>
+              </div>
+
+              <Button
+                onClick={() => (window.location.href = "/")}
+                className="font-body"
+              >
+                Back to Home
+              </Button>
             </div>
-
-            <Button
-              onClick={() => (window.location.href = "/")}
-              className="font-body"
-            >
-              Back to Home
-            </Button>
-          </div>
-        </Card>
+          </Card>
+        </motion.div>
       </div>
     );
   }
@@ -396,7 +449,7 @@ export const MultiplayerGameBoard: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Game Header */}
-      <Card className="p-4 shadow-lg">
+      <Card className="p-4 shadow-lg border-primary/20">
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-xl font-bold font-heading">
@@ -417,115 +470,148 @@ export const MultiplayerGameBoard: React.FC = () => {
       <Card className="p-4 shadow-lg">
         <h3 className="font-semibold mb-3 font-heading">Scoreboard</h3>
         <div className="space-y-2">
-          {players
-            .sort((a, b) => b.totalScore - a.totalScore)
-            .map((p) => (
-              <div
-                key={p.id}
-                className={`flex items-center justify-between p-3 rounded-lg border ${
-                  p.id === player?.id
-                    ? "border-primary bg-primary/5"
-                    : "border-border"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{p.name}</span>
-                      {p.id === player?.id && (
-                        <span className="text-xs text-muted-foreground">
-                          (You)
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Total: {p.totalScore} pts
+          <AnimatePresence mode="popLayout">
+            {players
+              .sort((a, b) => b.totalScore - a.totalScore)
+              .map((p) => (
+                <motion.div
+                  key={p.id}
+                  layout
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                    p.id === player?.id
+                      ? "border-primary bg-primary/5 shadow-sm"
+                      : "border-border"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{p.name}</span>
+                        {p.id === player?.id && (
+                          <span className="text-xs text-muted-foreground">
+                            (You)
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Total: {p.totalScore} pts
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {p.hasPublishedScore ? (
-                    <>
-                      <div className="flex gap-1 mr-2">
-                        {(p.hand || []).map((card, idx) => (
-                          <div
-                            key={idx}
-                            className="w-6 h-9 rounded border border-border bg-white flex flex-col items-center justify-center shadow-sm"
-                          >
-                            <span
-                              className={
-                                card.suit === "♥" || card.suit === "♦"
-                                  ? "text-red-500 font-bold text-xs"
-                                  : "text-gray-900 font-bold text-xs"
-                              }
+                  <div className="flex items-center gap-2">
+                    {p.hasPublishedScore ? (
+                      <>
+                        <div className="flex gap-1 mr-2">
+                          {(p.hand || []).map((card, idx) => (
+                            <motion.div
+                              key={idx}
+                              initial={{ opacity: 0, scale: 0.5 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              transition={{ delay: idx * 0.1 }}
+                              className="w-6 h-9 rounded border border-border bg-white flex flex-col items-center justify-center shadow-sm"
                             >
-                              {card.rank}
-                            </span>
-                            <span
-                              className={
-                                card.suit === "♥" || card.suit === "♦"
-                                  ? "text-red-500"
-                                  : "text-gray-900"
-                              }
-                              style={{ fontSize: "8px" }}
-                            >
-                              {card.suit}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                      <Badge variant="secondary">{p.score ?? 0}</Badge>
-                      <Eye className="w-4 h-4 text-green-500" />
-                    </>
-                  ) : (
-                    <EyeOff className="w-4 h-4 text-muted-foreground" />
-                  )}
-                </div>
-              </div>
-            ))}
+                              <span
+                                className={
+                                  card.suit === "♥" || card.suit === "♦"
+                                    ? "text-red-500 font-bold text-xs"
+                                    : "text-gray-900 font-bold text-xs"
+                                }
+                              >
+                                {card.rank}
+                              </span>
+                              <span
+                                className={
+                                  card.suit === "♥" || card.suit === "♦"
+                                    ? "text-red-500"
+                                    : "text-gray-900"
+                                }
+                                style={{ fontSize: "6px" }}
+                              >
+                                {card.suit}
+                              </span>
+                            </motion.div>
+                          ))}
+                        </div>
+                        <Badge variant="secondary">{p.score ?? 0}</Badge>
+                        <Eye className="w-4 h-4 text-green-500" />
+                      </>
+                    ) : (
+                      <EyeOff className="w-4 h-4 text-muted-foreground" />
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+          </AnimatePresence>
         </div>
       </Card>
 
       {/* Player's Hand */}
-      <Card className="p-6 shadow-lg">
+      <Card className="p-6 shadow-lg border-primary/10">
         <h3 className="font-semibold mb-4 font-heading">Your Hand</h3>
 
         <div className="space-y-4">
           <div className="flex justify-center gap-4">
             {playerHand.map((card, index) => (
-              <button
+              <motion.button
                 key={index}
-                type="button"
+                whileHover={!card ? { scale: 1.05 } : {}}
+                whileTap={!card ? { scale: 0.95 } : {}}
                 onClick={() => handleDrawCard(index)}
                 disabled={!!card || drawCardMutation.isPending}
-                className={`w-20 h-28 rounded-lg border-2 shadow-lg transition-all duration-200 flex flex-col items-center justify-center ${
+                className={`group relative w-20 h-28 rounded-xl border-2 shadow-lg transition-all duration-300 flex flex-col items-center justify-center overflow-hidden ${
                   card
                     ? "bg-white border-border"
-                    : "bg-linear-to-br from-slate-900 to-slate-700 border-slate-600 hover:scale-105 hover:border-primary"
+                    : "bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 border-slate-700 hover:border-primary/50"
                 }`}
-                aria-label={
-                  card
-                    ? `Card ${card.rank}${card.suit}`
-                    : `Draw card ${index + 1}`
-                }
               >
-                {card ? (
-                  <>
-                    <span
-                      className={`text-3xl font-bold ${getCardColor(card.suit)}`}
+                <AnimatePresence mode="wait">
+                  {card ? (
+                    <motion.div
+                      key="front"
+                      initial={{ rotateY: 180, opacity: 0 }}
+                      animate={{ rotateY: 0, opacity: 1 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 260,
+                        damping: 20,
+                      }}
+                      className="flex flex-col items-center justify-center"
                     >
-                      {card.rank}
-                    </span>
-                    <span className={`text-2xl ${getCardColor(card.suit)}`}>
-                      {card.suit}
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-xs font-semibold text-slate-200 font-body">
-                    Draw
-                  </span>
+                      <span
+                        className={`text-3xl font-bold ${getCardColor(card.suit)}`}
+                      >
+                        {card.rank}
+                      </span>
+                      <span className={`text-2xl ${getCardColor(card.suit)}`}>
+                        {card.suit}
+                      </span>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="back"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="flex flex-col items-center justify-center"
+                    >
+                      <div className="w-12 h-16 rounded border-2 border-slate-700 bg-slate-800/50 flex flex-col items-center justify-center opacity-40 group-hover:opacity-100 transition-opacity">
+                        <div className="w-6 h-6 rounded-full border border-slate-600 bg-slate-700/50" />
+                      </div>
+                      <span className="mt-2 text-[10px] font-bold text-slate-400 font-heading uppercase tracking-widest">
+                        Draw
+                      </span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Subtle highlight effect */}
+                {!card && (
+                  <div className="absolute inset-0 bg-linear-to-tr from-primary/0 via-primary/5 to-primary/0 opacity-0 group-hover:opacity-100 transition-opacity" />
                 )}
-              </button>
+              </motion.button>
             ))}
           </div>
 
@@ -534,25 +620,34 @@ export const MultiplayerGameBoard: React.FC = () => {
           </p>
 
           {hasDealt && (
-            <div className="text-center">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center"
+            >
               {showScore ? (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <Badge
                     variant="secondary"
-                    className="text-lg px-4 py-2 font-body"
+                    className="text-lg px-6 py-2 font-heading bg-primary/10 text-primary border-primary/20"
                   >
                     Score: {playerScore}
                   </Badge>
                   {currentPlayer?.hasPublishedScore && (
-                    <p className="text-sm text-green-600 font-body">
+                    <motion.p
+                      initial={{ scale: 0.9, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="text-sm font-semibold text-green-600 font-body flex items-center justify-center gap-2"
+                    >
+                      <Eye className="w-4 h-4" />
                       Score published!
-                    </p>
+                    </motion.p>
                   )}
                 </div>
               ) : (
                 <Button
                   onClick={publishScore}
-                  className="font-body"
+                  className="font-body gaming-button px-8"
                   disabled={currentPlayer?.hasPublishedScore}
                 >
                   {currentPlayer?.hasPublishedScore
@@ -560,22 +655,33 @@ export const MultiplayerGameBoard: React.FC = () => {
                     : "Publish Score"}
                 </Button>
               )}
-            </div>
+            </motion.div>
           )}
         </div>
       </Card>
 
       {/* All Players Published - Show Round Results */}
-      {allPlayersPublished && !showRoundResult && (
-        <Card className="p-4 text-center">
-          <p className="mb-4 font-body">
-            All players have published their scores!
-          </p>
-          <Button onClick={handleViewRoundResult} className="font-body">
-            View Round Results
-          </Button>
-        </Card>
-      )}
+      <AnimatePresence>
+        {allPlayersPublished && !showRoundResult && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+          >
+            <Card className="p-6 text-center border-accent/20 bg-accent/5">
+              <p className="mb-4 font-body font-medium text-accent">
+                All players have published their scores!
+              </p>
+              <Button
+                onClick={handleViewRoundResult}
+                className="font-body gaming-button"
+              >
+                View Round Results
+              </Button>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

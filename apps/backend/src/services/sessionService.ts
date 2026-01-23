@@ -98,19 +98,46 @@ export class SessionService {
     // If no valid hands with cards, fall back to simple gameScore comparison
     let winnerPlayerId: string;
     if (handResults.length === 0) {
+      console.log(
+        `[RecalculatePoints] No hand results for round ${roundNumber}, falling back to score comparison`,
+      );
       const winner = roundScores.reduce((prev, current) =>
         current.gameScore > prev.gameScore ? current : prev,
       );
       winnerPlayerId = winner.playerId;
     } else {
       // Use hand evaluation to determine winner
+      console.log(
+        `[RecalculatePoints] Evaluating hands for ${handResults.length} players`,
+      );
       const winnerIndex = determineWinner(handResults.map((h) => h.hand));
-      winnerPlayerId = handResults[winnerIndex].playerId;
+
+      // We MUST use the winnerIndex from determineWinner to get the correct playerId from handResults
+      const winnerResult = handResults[winnerIndex];
+      if (!winnerResult) {
+        throw new Error(`Failed to determine winner for round ${roundNumber}`);
+      }
+      winnerPlayerId = winnerResult.playerId;
+
+      console.log(
+        `[RecalculatePoints] Round ${roundNumber} hand evaluation result: index ${winnerIndex}, winnerPlayerId ${winnerPlayerId}`,
+      );
+
+      // Log all hands for debugging
+      handResults.forEach((hr, idx) => {
+        console.log(
+          `[RecalculatePoints] Player ${idx}: ${hr.playerId}, Hand: ${hr.hand.type}, Score: ${hr.hand.score}`,
+        );
+      });
     }
 
     const loserCount = Math.max(roundScores.length - 1, 0);
     const winnerPoints = loserCount * 5;
     const loserPoints = -5;
+
+    console.log(
+      `[RecalculatePoints] Winner: ${winnerPlayerId}, Points Change: Winner +${winnerPoints}, Loser ${loserPoints}`,
+    );
 
     for (const scoreRow of roundScores) {
       const previousScore = await db
@@ -450,7 +477,10 @@ export class SessionService {
       )
       .orderBy(desc(sessionScores.roundNumber));
 
-    const lastCumulative = existingScores[0]?.cumulativeScore || 0;
+    // Get the latest cumulative score from PREVIOUS rounds
+    const lastSummary = existingScores.find((s) => s.roundNumber < roundNumber);
+    const lastCumulative = lastSummary?.cumulativeScore || 0;
+
     const scoreId = `${sessionId}-${roundNumber}-${playerId}`;
 
     const existingScore = await db
@@ -464,8 +494,8 @@ export class SessionService {
         .update(sessionScores)
         .set({
           gameScore: score,
-          pointsChange: 0,
-          cumulativeScore: lastCumulative,
+          // Do not reset pointsChange if it's already set (prevents race conditions with recalculateRoundPoints)
+          // pointsChange: 0,
         })
         .where(eq(sessionScores.id, scoreId))
         .returning();

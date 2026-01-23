@@ -130,14 +130,35 @@ export function sortCards(cards: Card[]): Card[] {
 // Check if hand is a Triple (three of a kind)
 export function isTriple(cards: Card[]): boolean {
   if (cards.length !== 3) return false;
-  return cards[0].rank === cards[1].rank && cards[1].rank === cards[2].rank;
+  const [c1, c2, c3] = cards;
+  if (!c1 || !c2 || !c3) return false;
+  return c1.rank === c2.rank && c2.rank === c3.rank;
 }
 
-// Check if hand is Ba Tiên (three face cards J, Q, K but not a Triple)
+// Check if hand is a Straight (three consecutive ranks) - "Liêng"
+export function isStraight(cards: Card[]): boolean {
+  if (cards.length !== 3) return false;
+
+  const ranks = cards.map((c) => RANK_ORDER[c.rank]).sort((a, b) => a - b);
+  const [r0, r1, r2] = ranks;
+
+  if (r0 === undefined || r1 === undefined || r2 === undefined) return false;
+
+  // Normal straight (e.g., 2-3-4, 8-9-10, J-Q-K, Q-K-A)
+  // With A=14, Q-K-A is 12-13-14 which is sequential.
+  // A-2-3 is 14-2-3 (sorted as 2-3-14) which is NOT sequential.
+  if (r0 + 1 === r1 && r1 + 1 === r2) {
+    return true;
+  }
+
+  return false;
+}
+
+// Check if hand is Ba Tiên (three face cards J, Q, K but not a Triple or Straight)
 export function isBaTien(cards: Card[]): boolean {
   if (cards.length !== 3) return false;
-  // Must not be a triple
-  if (isTriple(cards)) return false;
+  // Must not be a triple or straight
+  if (isTriple(cards) || isStraight(cards)) return false;
   // All cards must be face cards (J, Q, or K)
   return cards.every((card) => FACE_CARDS.includes(card.rank));
 }
@@ -169,6 +190,7 @@ export function isPair(cards: Card[]): {
 // Determine the hand type
 export function getHandType(cards: Card[]): HandType {
   if (isTriple(cards)) return "triple";
+  if (isStraight(cards)) return "straight";
   if (isBaTien(cards)) return "baTien";
   if (isPair(cards).isPair) return "pair";
   return "normal";
@@ -177,23 +199,40 @@ export function getHandType(cards: Card[]): HandType {
 // Evaluate a hand and return full result
 export function evaluateHand(cards: Card[]): HandResult {
   const type = getHandType(cards);
+  const pointSum = calculateScore(cards);
 
   switch (type) {
     case "triple": {
-      const tripleRank = cards[0].rank;
+      const tripleRank = cards[0]?.rank || "A";
       return {
         type,
         cards,
-        score: RANK_ORDER[tripleRank],
+        score: pointSum,
         tripleRank,
       };
     }
-    case "baTien": {
-      // Ba Tiên has no internal ranking beyond suit comparison
+    case "straight": {
+      // For straight, we still need the highest rank for tie-breaking
+      const ranks = cards.map((c) => RANK_ORDER[c.rank]).sort((a, b) => a - b);
+      const [r0, , r2] = ranks;
+
+      // Default to 0 if something is wrong (shouldn't happen with valid hand)
+      let highestRankValue = r2 || 0;
+      if (r0 === 1 && r2 === 13) {
+        highestRankValue = 14; // A is 14 in this case (Q-K-A)
+      }
       return {
         type,
         cards,
-        score: 0,
+        score: pointSum,
+        straightRank: highestRankValue,
+      };
+    }
+    case "baTien": {
+      return {
+        type,
+        cards,
+        score: pointSum,
       };
     }
     case "pair": {
@@ -201,17 +240,16 @@ export function evaluateHand(cards: Card[]): HandResult {
       return {
         type,
         cards,
-        score: RANK_ORDER[pairInfo.pairRank!],
+        score: pointSum,
         pairRank: pairInfo.pairRank,
         kicker: pairInfo.kicker,
       };
     }
     default: {
-      // Normal hand - score is sum mod 10
       return {
         type,
         cards,
-        score: calculateScore(cards),
+        score: pointSum,
       };
     }
   }
@@ -219,9 +257,12 @@ export function evaluateHand(cards: Card[]): HandResult {
 
 // Hand type priority for comparison (higher = better)
 const HAND_TYPE_PRIORITY: Record<HandType, number> = {
-  triple: 4,
+  triple: 5,
+  straight: 4,
   baTien: 3,
-  pair: 2,
+  // Pair and Normal are now the same priority level
+  // Points (score) will be compared first inside compareHands
+  pair: 1,
   normal: 1,
 };
 
@@ -236,8 +277,12 @@ export function compareSuits(cards1: Card[], cards2: Card[]): number {
   const sorted2 = sortCardsBySuit(cards2);
 
   for (let i = 0; i < sorted1.length; i++) {
-    const suit1 = SUIT_ORDER[sorted1[i].suit];
-    const suit2 = SUIT_ORDER[sorted2[i].suit];
+    const c1 = sorted1[i];
+    const c2 = sorted2[i];
+    if (!c1 || !c2) continue;
+
+    const suit1 = SUIT_ORDER[c1.suit];
+    const suit2 = SUIT_ORDER[c2.suit];
     if (suit1 > suit2) return 1;
     if (suit1 < suit2) return -1;
   }
@@ -247,46 +292,67 @@ export function compareSuits(cards1: Card[], cards2: Card[]): number {
 
 // Compare two hands (returns 1 if hand1 wins, -1 if hand2 wins, 0 if exact tie)
 export function compareHands(hand1: HandResult, hand2: HandResult): number {
-  // First compare hand types
+  // 1. Compare hand type priority (Sáp > Liêng > Ba Tây > Normal/Pair)
   const priority1 = HAND_TYPE_PRIORITY[hand1.type];
   const priority2 = HAND_TYPE_PRIORITY[hand2.type];
 
   if (priority1 > priority2) return 1;
   if (priority1 < priority2) return -1;
 
-  // Same hand type - compare within type
-  switch (hand1.type) {
-    case "triple": {
-      // Compare triple rank
-      if (hand1.score > hand2.score) return 1;
-      if (hand1.score < hand2.score) return -1;
-      // Same triple rank - compare suits
-      return compareSuits(hand1.cards, hand2.cards);
-    }
-    case "baTien": {
-      // Ba Tiên vs Ba Tiên - compare suits only
-      return compareSuits(hand1.cards, hand2.cards);
-    }
-    case "pair": {
-      // Compare pair rank
-      if (hand1.score > hand2.score) return 1;
-      if (hand1.score < hand2.score) return -1;
-      // Same pair rank - compare kicker value
-      const kicker1 = RANK_ORDER[hand1.kicker!.rank];
-      const kicker2 = RANK_ORDER[hand2.kicker!.rank];
-      if (kicker1 > kicker2) return 1;
-      if (kicker1 < kicker2) return -1;
-      // Same kicker rank - compare suits
-      return compareSuits(hand1.cards, hand2.cards);
-    }
-    case "normal": {
-      // Compare score (0-9)
-      if (hand1.score > hand2.score) return 1;
-      if (hand1.score < hand2.score) return -1;
-      // Same score - compare suits
-      return compareSuits(hand1.cards, hand2.cards);
-    }
+  // 2. Same hand type (Sáp, Liêng, Ba Tây) or same priority level (Pair, Normal)
+  if (hand1.type === "triple") {
+    const r1 = hand1.tripleRank ? RANK_ORDER[hand1.tripleRank] : 0;
+    const r2 = hand2.tripleRank ? RANK_ORDER[hand2.tripleRank] : 0;
+    if (r1 > r2) return 1;
+    if (r1 < r2) return -1;
+    return compareSuits(hand1.cards, hand2.cards);
   }
+
+  if (hand1.type === "straight") {
+    const r1 = hand1.straightRank || 0;
+    const r2 = hand2.straightRank || 0;
+    if (r1 > r2) return 1;
+    if (r1 < r2) return -1;
+    return compareSuits(hand1.cards, hand2.cards);
+  }
+
+  if (hand1.type === "baTien") {
+    return compareSuits(hand1.cards, hand2.cards);
+  }
+
+  // 3. Normal or Pair (priority 1)
+  // PRIMARY: Point sum (0-9)
+  if (hand1.score > hand2.score) return 1;
+  if (hand1.score < hand2.score) return -1;
+
+  // SECONDARY: Pair is a tie-breaker if points are equal
+  if (hand1.type === "pair" && hand2.type === "normal") return 1;
+  if (hand1.type === "normal" && hand2.type === "pair") return -1;
+
+  // TERTIARY: If both are Pairs, compare pair rank
+  if (hand1.type === "pair" && hand2.type === "pair") {
+    const r1 = hand1.pairRank ? RANK_ORDER[hand1.pairRank] : 0;
+    const r2 = hand2.pairRank ? RANK_ORDER[hand2.pairRank] : 0;
+    if (r1 > r2) return 1;
+    if (r1 < r2) return -1;
+  }
+
+  // FINAL: Highest card (Rank > Suit)
+  const cards1Sorted = [...hand1.cards].sort(
+    (a, b) => RANK_ORDER[b.rank] - RANK_ORDER[a.rank] || 0,
+  );
+  const cards2Sorted = [...hand2.cards].sort(
+    (a, b) => RANK_ORDER[b.rank] - RANK_ORDER[a.rank] || 0,
+  );
+
+  for (let i = 0; i < 3; i++) {
+    const r1 = RANK_ORDER[cards1Sorted[i]?.rank || "A"];
+    const r2 = RANK_ORDER[cards2Sorted[i]?.rank || "A"];
+    if (r1 > r2) return 1;
+    if (r1 < r2) return -1;
+  }
+
+  return compareSuits(hand1.cards, hand2.cards);
 }
 
 // Determine winner from multiple hands (returns index of winner)
@@ -296,7 +362,14 @@ export function determineWinner(hands: HandResult[]): number {
 
   let winnerIndex = 0;
   for (let i = 1; i < hands.length; i++) {
-    if (compareHands(hands[i], hands[winnerIndex]) > 0) {
+    const currentHand = hands[i];
+    const winnerHand = hands[winnerIndex];
+
+    if (
+      currentHand &&
+      winnerHand &&
+      compareHands(currentHand, winnerHand) > 0
+    ) {
       winnerIndex = i;
     }
   }

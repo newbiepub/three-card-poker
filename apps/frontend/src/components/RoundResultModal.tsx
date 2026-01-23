@@ -1,17 +1,11 @@
-import { useEffect, useState } from "react";
-import { Trophy, Crown, Sparkles, TrendingUp } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import type { Player, Card as CardType } from "@/types";
-
-interface GamePlayer extends Player {
-  hand: CardType[];
-  score: number | null;
-  hasPublishedScore: boolean;
-  roundScore: number;
-  totalScore: number;
-}
+import { type GamePlayer } from "@/store";
+import { compareHands, evaluateHand } from "@three-card-poker/shared";
+import { AnimatePresence, motion } from "framer-motion";
+import { ArrowRight, Crown, Sparkles, TrendingUp, Trophy } from "lucide-react";
+import { useEffect, useState } from "react";
 interface RoundResultModalProps {
   currentRound: number;
   roundWinner: GamePlayer | null;
@@ -27,253 +21,224 @@ export function RoundResultModal({
   onNextRound,
   isPending,
 }: RoundResultModalProps) {
-  const [isVisible, setIsVisible] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
 
   useEffect(() => {
-    // Trigger entrance animation
-    setIsVisible(true);
     setShowConfetti(true);
-
-    // Clean up confetti after animation
     const timer = setTimeout(() => setShowConfetti(false), 3000);
     return () => clearTimeout(timer);
   }, []);
 
-  const sortedPlayers = [...players].sort(
-    (a, b) => (b.score || 0) - (a.score || 0),
-  );
+  const sortedPlayers = [...players].sort((a, b) => {
+    if ((a.roundScore || 0) !== (b.roundScore || 0)) {
+      return (b.roundScore || 0) - (a.roundScore || 0);
+    }
+    if (a.hand && b.hand && a.hand.length === 3 && b.hand.length === 3) {
+      const handA = evaluateHand(a.hand);
+      const handB = evaluateHand(b.hand);
+      return compareHands(handB, handA);
+    }
+    return (b.score || 0) - (a.score || 0);
+  });
 
   return (
-    <>
-      {/* Overlay with CRT scanline effect */}
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-500"
-        style={{
-          background:
-            "radial-gradient(circle at center, rgba(37, 99, 235, 0.1) 0%, rgba(0, 0, 0, 0.8) 100%)",
-        }}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ type: "spring", damping: 25, stiffness: 200 }}
+        className="w-full max-w-2xl"
       >
-        {/* CRT scanlines overlay */}
-        <div
-          className="absolute inset-0 pointer-events-none opacity-20"
-          style={{
-            background:
-              "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(37, 99, 235, 0.03) 2px, rgba(37, 99, 235, 0.03) 4px)",
-          }}
-        />
-
-        <Card
-          className={`
-            relative w-full max-w-2xl overflow-hidden transition-all duration-700 ease-out
-            ${isVisible ? "scale-100 opacity-100 translate-y-0" : "scale-95 opacity-0 translate-y-4"}
-          `}
-          style={{
-            background:
-              "linear-gradient(135deg, rgba(248, 250, 252, 0.95) 0%, rgba(241, 245, 249, 0.95) 100%)",
-            boxShadow:
-              "0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(37, 99, 235, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1)",
-          }}
-        >
-          <div className="relative p-8">
-            {/* Winner celebration section */}
+        <Card className="relative overflow-hidden glass-card border-primary/20 shadow-2xl">
+          <div className="p-8">
+            {/* Winner Section */}
             <div className="text-center mb-8">
-              {/* Animated trophy with glow */}
-              <div className="relative inline-block mb-4">
-                <Trophy
-                  className="w-16 h-16 mx-auto text-yellow-500"
-                  style={{
-                    filter: "drop-shadow(0 0 20px rgba(245, 158, 11, 0.5))",
-                    animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-                  }}
-                />
-                {showConfetti && (
-                  <Sparkles className="absolute -top-2 -right-2 w-6 h-6 text-yellow-400 animate-spin" />
-                )}
-              </div>
-
-              {/* Winner title with neon effect */}
-              <h2
-                className="text-4xl font-bold mb-2 tracking-wider"
-                style={{
-                  fontFamily: '"Russo One", sans-serif',
-                  textShadow:
-                    "0 0 20px rgba(37, 99, 235, 0.5), 0 0 40px rgba(37, 99, 235, 0.3)",
-                }}
+              <motion.div
+                className="relative inline-block mb-4"
+                initial={{ rotate: -20, scale: 0 }}
+                animate={{ rotate: 0, scale: 1 }}
+                transition={{ delay: 0.2, type: "spring" }}
               >
-                ROUND {currentRound} WINNER!
-              </h2>
-
-              {/* Winner name and score */}
-              <div className="relative inline-block">
-                <div className="flex flex-col items-center">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Crown className="w-8 h-8 text-yellow-400" />
-                    <div
-                      className="text-2xl font-semibold text-blue-600"
-                      style={{ fontFamily: '"Chakra Petch", sans-serif' }}
-                    >
-                      {roundWinner?.name}
-                    </div>
-                    <Crown className="w-8 h-8 text-yellow-400" />
-                  </div>
-                  <div
-                    className="text-5xl font-black bg-linear-to-r from-blue-600 to-orange-500 bg-clip-text text-transparent"
-                    style={{ fontFamily: '"Russo One", sans-serif' }}
+                <Trophy className="w-16 h-16 mx-auto text-yellow-500 drop-shadow-lg" />
+                {showConfetti && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="absolute -top-2 -right-2"
                   >
-                    {roundWinner?.score || 0} POINTS
-                  </div>
+                    <Sparkles className="w-6 h-6 text-yellow-400 animate-pulse" />
+                  </motion.div>
+                )}
+              </motion.div>
+
+              <motion.h2
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+                className="text-3xl font-bold mb-4 font-heading tracking-tight"
+              >
+                ROUND {currentRound} WINNER
+              </motion.h2>
+
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="flex flex-col items-center gap-3"
+              >
+                <div className="flex items-center gap-3 px-6 py-2 rounded-full bg-primary/10 border border-primary/20">
+                  <Crown className="w-6 h-6 text-yellow-500" />
+                  <span className="text-2xl font-bold text-primary font-heading">
+                    {roundWinner?.name}
+                  </span>
+                  <Crown className="w-6 h-6 text-yellow-500" />
                 </div>
-              </div>
+
+                <div className="text-4xl font-black text-accent font-heading">
+                  {roundWinner?.score || 0} POINTS
+                </div>
+              </motion.div>
             </div>
 
-            {/* Scoreboard with improved design */}
+            {/* Scoreboard */}
             <div className="mb-8">
-              <h3
-                className="text-lg font-semibold mb-4 text-center text-gray-600"
-                style={{ fontFamily: '"Chakra Petch", sans-serif' }}
-              >
-                SCOREBOARD
+              <h3 className="text-sm font-bold mb-4 text-center text-muted-foreground uppercase tracking-widest font-heading">
+                Round Rankings
               </h3>
-              <div className="space-y-3">
-                {sortedPlayers.map((player, index) => (
-                  <div
-                    key={player.id}
-                    className={`
-                      flex items-center justify-between p-4 rounded-lg transition-all duration-300
-                      ${index === 0 ? "bg-linear-to-r from-yellow-50 to-orange-50 border-2 border-yellow-300" : "bg-gray-50"}
-                      ${player.id === roundWinner?.id ? "scale-105 shadow-lg" : ""}
-                    `}
-                  >
-                    <div className="flex items-center gap-3">
-                      {/* Position indicator */}
-                      <div
-                        className={`
-                          w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm
-                          ${index === 0 ? "bg-yellow-400 text-white" : "bg-gray-300 text-gray-700"}
-                        `}
-                        style={{ fontFamily: '"Russo One", sans-serif' }}
-                      >
-                        {index + 1}
-                      </div>
-
-                      {/* Player name with crown for winner */}
-                      <div className="flex items-center gap-2">
-                        {index === 0 && (
-                          <Crown className="w-5 h-5 text-yellow-500" />
-                        )}
+              <div className="space-y-2">
+                <AnimatePresence>
+                  {sortedPlayers.map((player, index) => (
+                    <motion.div
+                      key={player.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.5 + index * 0.1 }}
+                      className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
+                        index === 0
+                          ? "bg-accent/5 border-accent/20 shadow-md"
+                          : "bg-background/50 border-border"
+                      }`}
+                    >
+                      <div className="flex items-center gap-4">
                         <span
-                          className="font-medium"
-                          style={{ fontFamily: '"Chakra Petch", sans-serif' }}
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold font-heading ${
+                            index === 0
+                              ? "bg-accent text-white"
+                              : "bg-muted text-muted-foreground"
+                          }`}
                         >
-                          {player.name}
+                          {index + 1}
                         </span>
-                        {player.id === roundWinner?.id && (
-                          <Badge variant="secondary" className="ml-2">
-                            WINNER
-                          </Badge>
-                        )}
+
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold font-heading">
+                              {player.name}
+                            </span>
+                            {player.hand && player.hand.length === 3 && (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] uppercase font-bold text-primary"
+                              >
+                                {evaluateHand(player.hand).type === "baTien"
+                                  ? "Ba Tây"
+                                  : evaluateHand(player.hand).type === "triple"
+                                    ? "Sáp"
+                                    : evaluateHand(player.hand).type ===
+                                        "straight"
+                                      ? "Liêng"
+                                      : evaluateHand(player.hand).type ===
+                                          "pair"
+                                        ? "Đôi"
+                                        : `${player.score} Điểm`}
+                              </Badge>
+                            )}
+                          </div>
+
+                          {/* Player's cards minified */}
+                          <div className="flex gap-1 mt-1.5">
+                            {(player.hand || []).map((card, idx) => (
+                              <div
+                                key={idx}
+                                className="w-6 h-9 rounded border border-border bg-white flex flex-col items-center justify-center shadow-xs"
+                              >
+                                <span
+                                  className={`text-[10px] font-bold ${
+                                    card.suit === "♥" || card.suit === "♦"
+                                      ? "text-red-500"
+                                      : "text-gray-900"
+                                  }`}
+                                >
+                                  {card.rank}
+                                </span>
+                                <span
+                                  className={
+                                    card.suit === "♥" || card.suit === "♦"
+                                      ? "text-red-500"
+                                      : "text-gray-900"
+                                  }
+                                  style={{ fontSize: "6px" }}
+                                >
+                                  {card.suit}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Score with trend indicator */}
-                    <div className="flex items-center gap-2">
-                      {index === 0 && (
-                        <TrendingUp className="w-4 h-4 text-green-500" />
-                      )}
-                      <span
-                        className={`
-                          text-xl font-bold
-                          ${index === 0 ? "text-orange-600" : "text-gray-700"}
-                        `}
-                        style={{ fontFamily: '"Russo One", sans-serif' }}
-                      >
-                        {player.score || 0}
-                      </span>
-                      <span className="text-sm text-gray-500">pts</span>
-                    </div>
-
-                    {/* Player's cards */}
-                    <div className="flex gap-1 mt-2">
-                      {(player.hand || []).map((card, idx) => (
-                        <div
-                          key={idx}
-                          className="w-8 h-12 rounded border border-gray-200 bg-white flex flex-col items-center justify-center shadow-sm"
-                        >
+                      <div className="flex flex-col items-end">
+                        <div className="flex items-center gap-2">
                           <span
-                            className={
-                              card.suit === "♥" || card.suit === "♦"
-                                ? "text-red-500 font-bold text-sm"
-                                : "text-gray-900 font-bold text-sm"
-                            }
+                            className={`text-2xl font-black font-heading ${
+                              index === 0 ? "text-accent" : "text-foreground"
+                            }`}
                           >
-                            {card.rank}
+                            {player.score || 0}
                           </span>
-                          <span
-                            className={
-                              card.suit === "♥" || card.suit === "♦"
-                                ? "text-red-500"
-                                : "text-gray-900"
-                            }
-                            style={{ fontSize: "10px" }}
-                          >
-                            {card.suit}
+                          <span className="text-xs text-muted-foreground font-bold">
+                            PTS
                           </span>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                        {index === 0 && (
+                          <div className="flex items-center gap-1 text-[10px] font-bold text-green-600">
+                            <TrendingUp className="w-3 h-3" />
+                            TOP
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
               </div>
             </div>
 
-            {/* Next Round button with enhanced styling */}
-            <Button
-              onClick={onNextRound}
-              disabled={isPending}
-              className="w-full h-14 text-lg font-bold tracking-wide transition-all duration-300 hover:scale-105"
-              style={{
-                fontFamily: '"Russo One", sans-serif',
-                background: "linear-gradient(45deg, #F97316, #FB923C)",
-                boxShadow: "0 4px 14px 0 rgba(249, 115, 22, 0.3)",
-              }}
+            {/* Actions */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1 }}
             >
-              {isPending ? (
-                <span className="flex items-center gap-2">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  PREPARING NEXT ROUND...
-                </span>
-              ) : (
-                "NEXT ROUND →"
-              )}
-            </Button>
+              <Button
+                onClick={onNextRound}
+                disabled={isPending}
+                className="w-full h-16 text-lg gaming-button"
+              >
+                {isPending ? (
+                  <span className="flex items-center gap-3">
+                    <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                    PREPARING...
+                  </span>
+                ) : (
+                  <span className="flex items-center justify-center gap-2">
+                    NEXT ROUND <ArrowRight className="w-5 h-5" />
+                  </span>
+                )}
+              </Button>
+            </motion.div>
           </div>
         </Card>
-      </div>
-
-      {/* Custom styles for animations */}
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-          @keyframes pulse {
-            0%, 100% {
-              opacity: 1;
-            }
-            50% {
-              opacity: 0.8;
-            }
-          }
-          
-          @media (prefers-reduced-motion: reduce) {
-            * {
-              animation-duration: 0.01ms !important;
-              animation-iteration-count: 1 !important;
-              transition-duration: 0.01ms !important;
-            }
-          }
-        `,
-        }}
-      />
-    </>
+      </motion.div>
+    </div>
   );
 }

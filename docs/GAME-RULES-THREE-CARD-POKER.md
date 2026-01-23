@@ -37,7 +37,7 @@
 ### 4.1 Triple vs Triple
 
 - Compare triple value: higher triple wins.
-- Value order: A < 2 < … < 10 < J < Q < K.
+- Value order: 2 < 3 < … < 10 < J < Q < K < A.
 - If absolute tie-breaking is required: compare suits per section 4.5.
 
 ### 4.2 Ba Tiên vs Ba Tiên
@@ -57,7 +57,8 @@ Compare in order:
 Compare in order:
 
 1. Score (0–9): higher score wins
-2. If scores equal → compare suits per section 4.5 (to ensure no tie)
+2. If scores equal → compare Highest Rank (A > K > Q > ... > 2)
+3. If still equal → compare suits per section 4.5 (to ensure no tie)
 
 ### 4.5 Suit Comparison Rules (Tie-breaking - applies when needed)
 
@@ -79,6 +80,4 @@ Compare in order:
 
 ---
 
-## 5) One-Line Summary for Agent
-
-- Triple > Ba Tiên > Pair > Normal; if equal then break tie by suit order: Spades < Clubs < Diamonds < Hearts; compare sequentially: highest → second highest → third highest suit (no ties).
+- Triple > Liêng > Ba Tiên > Pair > Normal; if same points then break tie by: Highest Rank > Suit Order (Spades < Clubs < Diamonds < Hearts). Standard sequential card comparison ensures no ties. Note: Ace is the highest rank (A > K). **A-2-3 is NOT a Straight (Liêng), but Q-K-A IS a Straight.**

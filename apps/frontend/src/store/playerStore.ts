@@ -1,11 +1,11 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import type { Player } from '@/types';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import type { PlayerProfile } from "@/types";
 
 interface PlayerState {
-  player: Player | null;
+  player: PlayerProfile | null;
   isAuthenticated: boolean;
-  setPlayer: (player: Player) => void;
+  setPlayer: (player: PlayerProfile) => void;
   logout: () => void;
 }
 
@@ -18,7 +18,7 @@ export const usePlayerStore = create<PlayerState>()(
       logout: () => set({ player: null, isAuthenticated: false }),
     }),
     {
-      name: 'three-card-poker-player',
-    }
-  )
+      name: "three-card-poker-player",
+    },
+  ),
 );

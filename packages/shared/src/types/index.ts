@@ -22,7 +22,7 @@ export interface Card {
 }
 
 // Hand types for Three Card Poker (ranked from highest to lowest)
-export type HandType = "triple" | "baTien" | "pair" | "normal";
+export type HandType = "triple" | "straight" | "baTien" | "pair" | "normal";
 
 // Hand evaluation result
 export interface HandResult {
@@ -33,6 +33,7 @@ export interface HandResult {
   score: number;
   // Additional data for tie-breaking
   tripleRank?: Rank;
+  straightRank?: number;
   pairRank?: Rank;
   kicker?: Card;
 }
@@ -41,11 +42,11 @@ export interface HandResult {
 export interface Player {
   id: string;
   name: string;
-  cards: Card[];
-  score?: number;
-  isReady: boolean;
-  hasRevealed: boolean;
-  isDealer: boolean;
+  cards?: Card[];
+  score?: number | null;
+  isReady?: boolean;
+  hasRevealed?: boolean;
+  isDealer?: boolean;
 }
 
 // Room types

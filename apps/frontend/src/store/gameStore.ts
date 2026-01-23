@@ -1,7 +1,7 @@
 import { create } from "zustand";
-import type { Player, Card } from "@/types";
+import type { Player, Card } from "@three-card-poker/shared";
 
-interface GamePlayer extends Player {
+export interface GamePlayer extends Player {
   hand: Card[];
   score: number | null;
   hasPublishedScore: boolean;

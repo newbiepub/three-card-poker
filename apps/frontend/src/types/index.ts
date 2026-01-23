@@ -1,4 +1,4 @@
-export interface Player {
+export interface PlayerProfile {
   id: string;
   name: string;
   createdAt: string;
@@ -13,7 +13,7 @@ export interface Player {
 export interface Room {
   id: string;
   name: string;
-  status: 'waiting' | 'playing' | 'finished';
+  status: "waiting" | "playing" | "finished";
   maxPlayers: number;
   roomCode: string;
   hostId: string;
@@ -28,7 +28,7 @@ export interface Session {
   hostId: string;
   totalRounds: number;
   currentRound: number;
-  status: 'waiting' | 'playing' | 'finished';
+  status: "waiting" | "playing" | "finished";
   startedAt: string;
   finishedAt: string | null;
 }
@@ -36,7 +36,7 @@ export interface Session {
 export interface Game {
   id: string;
   roomId: string;
-  status: 'dealing' | 'playing' | 'finished';
+  status: "dealing" | "playing" | "finished";
   dealerId: string;
   roundNumber: number;
   pot: number;
@@ -46,8 +46,21 @@ export interface Game {
 }
 
 export interface Card {
-  suit: '♠' | '♥' | '♦' | '♣';
-  rank: 'A' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K';
+  suit: "♠" | "♥" | "♦" | "♣";
+  rank:
+    | "A"
+    | "2"
+    | "3"
+    | "4"
+    | "5"
+    | "6"
+    | "7"
+    | "8"
+    | "9"
+    | "10"
+    | "J"
+    | "Q"
+    | "K";
   value: number;
 }
 
@@ -67,13 +80,13 @@ export interface CreateRoomResponse {
   room: Room;
   roomCode: string;
   session: Session;
-  host: Player;
+  host: PlayerProfile;
 }
 
 export interface JoinRoomResponse {
   room: Room;
   session: Session | null;
-  player: Player;
+  player: PlayerProfile;
   isHost: boolean;
 }
 
