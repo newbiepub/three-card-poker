@@ -469,7 +469,9 @@ export const MultiplayerGameBoard: React.FC = () => {
       {/* Scoreboard */}
       <Card className="p-4 shadow-lg">
         <h3 className="font-semibold mb-3 font-heading">Scoreboard</h3>
-        <div className="space-y-2">
+        <div
+          className={`space-y-2 ${players.length > 6 ? "grid grid-cols-1 md:grid-cols-2 gap-3 space-y-0" : "space-y-2"}`}
+        >
           <AnimatePresence mode="popLayout">
             {players
               .sort((a, b) => b.totalScore - a.totalScore)

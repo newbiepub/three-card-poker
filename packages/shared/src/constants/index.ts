@@ -65,7 +65,7 @@ export const FACE_CARDS: Rank[] = ["J", "Q", "K"];
 
 // Game configuration
 export const GAME_CONFIG = {
-  MAX_PLAYERS: 6,
+  MAX_PLAYERS: 12,
   MIN_PLAYERS: 2,
   CARDS_PER_PLAYER: 3,
   DECK_SIZE: 52,

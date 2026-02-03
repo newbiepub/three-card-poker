@@ -59,7 +59,9 @@ export function RoomLobby({
                 Players ({players.length}/{room.maxPlayers})
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent
+              className={`space-y-3 ${players.length > 6 ? "grid grid-cols-1 sm:grid-cols-2 gap-3 space-y-0" : "space-y-3"}`}
+            >
               <AnimatePresence>
                 {players.map((player) => (
                   <motion.div

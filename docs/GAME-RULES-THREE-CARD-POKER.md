@@ -80,4 +80,4 @@ Compare in order:
 
 ---
 
-- Triple > Liêng > Ba Tiên > Pair > Normal; if same points then break tie by: Highest Rank > Suit Order (Spades < Clubs < Diamonds < Hearts). Standard sequential card comparison ensures no ties. Note: Ace is the highest rank (A > K). **A-2-3 is NOT a Straight (Liêng), but Q-K-A IS a Straight.**
+- Triple > Ba Tiên > Pair > Normal; if same points then break tie by: Highest Rank > Suit Order (Spades < Clubs < Diamonds < Hearts). Standard sequential card comparison ensures no ties. Note: Ace is the highest rank (A > K).

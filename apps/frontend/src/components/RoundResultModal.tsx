@@ -144,13 +144,9 @@ export function RoundResultModal({
                                   ? "Ba Tây"
                                   : evaluateHand(player.hand).type === "triple"
                                     ? "Sáp"
-                                    : evaluateHand(player.hand).type ===
-                                        "straight"
-                                      ? "Liêng"
-                                      : evaluateHand(player.hand).type ===
-                                          "pair"
-                                        ? "Đôi"
-                                        : `${player.score} Điểm`}
+                                    : evaluateHand(player.hand).type === "pair"
+                                      ? "Đôi"
+                                      : `${player.score} Điểm`}
                               </Badge>
                             )}
                           </div>

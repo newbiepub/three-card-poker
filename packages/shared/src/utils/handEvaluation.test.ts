@@ -138,7 +138,7 @@ describe("getHandType", () => {
     ).toBe("normal");
     expect(
       getHandType([card("Q", "♥"), card("K", "♦"), card("A", "♠")]),
-    ).toBe("straight");
+    ).toBe("normal");
     expect(
       getHandType([card("A", "♥"), card("2", "♦"), card("3", "♠")]),
     ).toBe("normal");

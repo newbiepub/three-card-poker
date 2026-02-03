@@ -5,10 +5,14 @@ import { RoomCodeService } from "./roomCodeService";
 
 export class RoomService {
   // Create a new room with 6-digit code
-  static async createRoom(name: string, hostId: string, maxPlayers: number = 6): Promise<Room & { roomCode: string }> {
+  static async createRoom(
+    name: string,
+    hostId: string,
+    maxPlayers: number = 12,
+  ): Promise<Room & { roomCode: string }> {
     // Generate unique room code
     const roomCode = await RoomCodeService.generateRoomCode();
-    
+
     const newRoom: NewRoom = {
       id: generateRoomId(),
       name,
@@ -19,8 +23,8 @@ export class RoomService {
     };
 
     const [room] = await db.insert(rooms).values(newRoom).returning();
-    if (!room) throw new Error('Room not created');
-    
+    if (!room) throw new Error("Room not created");
+
     return { ...room, roomCode };
   }
 
@@ -36,15 +40,18 @@ export class RoomService {
   }
 
   // Update room status
-  static async updateRoomStatus(id: string, status: Room["status"]): Promise<void> {
-    await db
-      .update(rooms)
-      .set({ status })
-      .where(eq(rooms.id, id));
+  static async updateRoomStatus(
+    id: string,
+    status: Room["status"],
+  ): Promise<void> {
+    await db.update(rooms).set({ status }).where(eq(rooms.id, id));
   }
 
   // Set current session for room
-  static async setCurrentSession(roomId: string, sessionId: string | null): Promise<void> {
+  static async setCurrentSession(
+    roomId: string,
+    sessionId: string | null,
+  ): Promise<void> {
     await db
       .update(rooms)
       .set({ currentSessionId: sessionId })
@@ -68,7 +75,7 @@ export class RoomService {
       .select({ hostId: rooms.hostId })
       .from(rooms)
       .where(eq(rooms.id, roomId));
-    
+
     return room?.hostId === playerId;
   }
 
@@ -82,8 +89,8 @@ export class RoomService {
       .where(
         and(
           eq(rooms.status, "finished"),
-          sql`${rooms.finishedAt} < ${cutoffDate.getTime()}`
-        )
+          sql`${rooms.finishedAt} < ${cutoffDate.getTime()}`,
+        ),
       );
 
     // Execute and get count
@@ -93,8 +100,8 @@ export class RoomService {
       .where(
         and(
           eq(rooms.status, "finished"),
-          sql`${rooms.finishedAt} < ${cutoffDate.getTime()}`
-        )
+          sql`${rooms.finishedAt} < ${cutoffDate.getTime()}`,
+        ),
       );
 
     if (roomsToDelete.length > 0) {
@@ -116,11 +123,13 @@ export class RoomService {
       .leftJoin(gamePlayers, eq(games.id, gamePlayers.gameId))
       .where(eq(games.roomId, roomId));
 
-    return stats[0] || {
-      totalGames: 0,
-      totalPlayers: 0,
-      avgScore: 0,
-    };
+    return (
+      stats[0] || {
+        totalGames: 0,
+        totalPlayers: 0,
+        avgScore: 0,
+      }
+    );
   }
 }
 
