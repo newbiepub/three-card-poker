@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from "../ui/card";
 import { Badge } from "../ui/badge";
-import { Users, Crown, Play } from "lucide-react";
+import { Users, Crown, Play, X } from "lucide-react";
 import type { Room, Session } from "@/types";
 import type { Player } from "@three-card-poker/shared";
 
@@ -20,6 +20,7 @@ interface RoomLobbyProps {
   isHost: boolean;
   onStartSession: () => void;
   onLeaveRoom: () => void;
+  onKickPlayer?: (playerId: string) => void;
 }
 
 export function RoomLobby({
@@ -30,6 +31,7 @@ export function RoomLobby({
   isHost,
   onStartSession,
   onLeaveRoom,
+  onKickPlayer,
 }: RoomLobbyProps) {
   return (
     <div className="min-h-screen bg-background p-4 crt-scanlines">
@@ -93,12 +95,28 @@ export function RoomLobby({
                         </p>
                       </div>
                     </div>
-                    {player.id === room.hostId && (
-                      <Badge variant="secondary" className="font-body">
-                        <Crown className="w-3 h-3 mr-1" />
-                        Host
-                      </Badge>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {player.id === room.hostId && (
+                        <Badge variant="secondary" className="font-body">
+                          <Crown className="w-3 h-3 mr-1" />
+                          Host
+                        </Badge>
+                      )}
+                      {isHost &&
+                        player.id !== currentUserId &&
+                        player.id !== room.hostId && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onKickPlayer?.(player.id);
+                            }}
+                            className="p-1 rounded hover:bg-red-100 hover:text-red-500 transition-colors"
+                            title="Kick player"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                    </div>
                   </motion.div>
                 ))}
               </AnimatePresence>

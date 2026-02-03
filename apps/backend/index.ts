@@ -118,6 +118,9 @@ export default {
           case "nextRound":
             await handleNextRound(ws, data);
             break;
+          case "kickPlayer":
+            await handleKickPlayer(ws, data);
+            break;
           default:
             ws.send(
               JSON.stringify({ type: "error", message: "Unknown event type" }),
@@ -357,4 +360,94 @@ function handleDisconnect(ws: any) {
     playerName,
     totalPlayers: connections?.size || 0,
   });
+}
+
+async function handleKickPlayer(ws: any, data: any) {
+  const info = connectionInfo.get(ws);
+  if (!info) return;
+
+  const { roomCode, playerId: callerId } = info;
+  const { targetPlayerId } = data;
+
+  try {
+    // Get room to verify host
+    const room = await RoomService.getRoomByCode(roomCode);
+    if (!room) {
+      ws.send(JSON.stringify({ type: "error", message: "Room not found" }));
+      return;
+    }
+
+    // Only host can kick players
+    if (room.hostId !== callerId) {
+      ws.send(
+        JSON.stringify({
+          type: "error",
+          message: "Only host can kick players",
+        }),
+      );
+      return;
+    }
+
+    // Cannot kick yourself (the host)
+    if (targetPlayerId === callerId) {
+      ws.send(
+        JSON.stringify({ type: "error", message: "Cannot kick yourself" }),
+      );
+      return;
+    }
+
+    // Find the target player's WebSocket connection
+    const connections = roomConnections.get(roomCode);
+    if (!connections) return;
+
+    let targetWs: any = null;
+    let targetPlayerName = "";
+
+    for (const [clientWs, playerInfo] of connections.entries()) {
+      if (playerInfo.playerId === targetPlayerId) {
+        targetWs = clientWs;
+        targetPlayerName = playerInfo.playerName;
+        break;
+      }
+    }
+
+    if (!targetWs) {
+      ws.send(
+        JSON.stringify({ type: "error", message: "Player not found in room" }),
+      );
+      return;
+    }
+
+    // Send kick notification to the target player
+    targetWs.send(
+      JSON.stringify({
+        type: "playerKicked",
+        reason: "You have been kicked by the host",
+      }),
+    );
+
+    // Remove from connections
+    connections.delete(targetWs);
+    connectionInfo.delete(targetWs);
+
+    // Close the target's WebSocket
+    try {
+      targetWs.close();
+    } catch (error) {
+      console.error("Error closing kicked player WebSocket:", error);
+    }
+
+    // Broadcast player left to remaining players
+    broadcastToRoom(roomCode, {
+      type: "playerLeft",
+      playerId: targetPlayerId,
+      playerName: targetPlayerName,
+      totalPlayers: connections.size,
+    });
+  } catch (error) {
+    console.error("Error kicking player:", error);
+    ws.send(
+      JSON.stringify({ type: "error", message: "Failed to kick player" }),
+    );
+  }
 }

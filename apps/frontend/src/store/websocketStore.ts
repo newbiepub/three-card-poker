@@ -175,6 +175,15 @@ export const useWebSocketStore = create<WebSocketState>((set, get) => ({
           case "error":
             set({ error: data.message as string });
             break;
+
+          case "playerKicked":
+            // Disconnect and clear stores when kicked
+            get().disconnect();
+            useRoomStore.getState().clearRoom();
+            useGameStore.getState().resetGame();
+            // Redirect to home
+            window.location.href = "/?kicked=true";
+            break;
         }
       } catch (error) {
         console.error("Failed to parse WebSocket message:", error);

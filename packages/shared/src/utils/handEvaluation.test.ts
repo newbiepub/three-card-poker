@@ -343,6 +343,23 @@ describe("compareHands", () => {
 
     expect(compareHands(handWithA, handWithK)).toBe(1);
     expect(compareHands(handWithK, handWithA)).toBe(-1);
+
+    // User requested case: J♦ (high card) vs J♠ (high card) in 9-point hands
+    // Hand 1: 2♥, J♦, 7♠ -> (2+0+7)=9 pts, high card J♦
+    // Hand 2: 10♦, J♠, 9♠ -> (0+0+9)=9 pts, high card J♠
+    const handWithJDiamond = evaluateHand([
+      card("2", "♥"),
+      card("J", "♦"),
+      card("7", "♠"),
+    ]);
+    const handWithJSpade = evaluateHand([
+      card("10", "♦"),
+      card("J", "♠"),
+      card("9", "♠"),
+    ]);
+
+    expect(compareHands(handWithJDiamond, handWithJSpade)).toBe(1); // J♦ > J♠
+    expect(compareHands(handWithJSpade, handWithJDiamond)).toBe(-1);
   });
 });
 

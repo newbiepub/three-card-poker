@@ -1,12 +1,11 @@
-import type { Card, HandType, HandResult, Rank } from "../types";
+import type { Card, HandResult, HandType, Rank } from "../types";
 import {
   CARD_VALUES,
-  SUITS,
-  RANKS,
-  GAME_CONFIG,
-  SUIT_ORDER,
-  RANK_ORDER,
   FACE_CARDS,
+  RANK_ORDER,
+  RANKS,
+  SUIT_ORDER,
+  SUITS,
 } from "../constants";
 
 // Create a standard 52-card deck
@@ -46,24 +45,6 @@ export function calculateScore(cards: Card[]): number {
   return sum % 10;
 }
 
-// Deal cards to players
-export function dealCards(deck: Card[], playerCount: number): Card[][] {
-  const hands: Card[][] = [];
-
-  for (let i = 0; i < playerCount; i++) {
-    const hand: Card[] = [];
-    for (let j = 0; j < GAME_CONFIG.CARDS_PER_PLAYER; j++) {
-      const card = deck.pop();
-      if (card) {
-        hand.push(card);
-      }
-    }
-    hands.push(hand);
-  }
-
-  return hands;
-}
-
 // Generate random room ID
 export function generateRoomId(): string {
   return Math.random().toString(36).substr(2, 9);
@@ -82,45 +63,6 @@ export function generateGameId(): string {
 // Generate random session ID
 export function generateSessionId(): string {
   return "session-" + Math.random().toString(36).substr(2, 9);
-}
-
-// Validate card hand
-export function isValidHand(cards: Card[]): boolean {
-  if (cards.length !== GAME_CONFIG.CARDS_PER_PLAYER) {
-    return false;
-  }
-
-  // Check for duplicate cards
-  const cardStrings = cards.map((c) => `${c.rank}${c.suit}`);
-  const uniqueCards = new Set(cardStrings);
-
-  return uniqueCards.size === cards.length;
-}
-
-// Get card display name
-export function getCardName(card: Card): string {
-  return `${card.rank}${card.suit}`;
-}
-
-// Check if a score is the highest (for determining winner)
-export function isHighestScore(scores: number[], targetScore: number): boolean {
-  const maxScore = Math.max(...scores);
-  return targetScore === maxScore;
-}
-
-// Format score for display
-export function formatScore(score: number): string {
-  return score.toString();
-}
-
-// Sort cards by rank and suit
-export function sortCards(cards: Card[]): Card[] {
-  return [...cards].sort((a, b) => {
-    const rankOrder = RANKS.indexOf(a.rank) - RANKS.indexOf(b.rank);
-    if (rankOrder !== 0) return rankOrder;
-
-    return SUITS.indexOf(a.suit) - SUITS.indexOf(b.suit);
-  });
 }
 
 // ============================================
@@ -291,22 +233,29 @@ export function compareHands(hand1: HandResult, hand2: HandResult): number {
     if (r1 < r2) return -1;
   }
 
-  // FINAL: Highest card (Rank > Suit)
-  const cards1Sorted = [...hand1.cards].sort(
-    (a, b) => RANK_ORDER[b.rank] - RANK_ORDER[a.rank] || 0,
-  );
-  const cards2Sorted = [...hand2.cards].sort(
-    (a, b) => RANK_ORDER[b.rank] - RANK_ORDER[a.rank] || 0,
-  );
+  // FINAL: Single Highest Card (Rank > Suit)
+  const getHighestCard = (cards: Card[]) => {
+    return [...cards].sort((a, b) => {
+      const rankDiff = RANK_ORDER[b.rank] - RANK_ORDER[a.rank];
+      if (rankDiff !== 0) return rankDiff;
+      return SUIT_ORDER[b.suit] - SUIT_ORDER[a.suit];
+    })[0]!;
+  };
 
-  for (let i = 0; i < 3; i++) {
-    const r1 = RANK_ORDER[cards1Sorted[i]?.rank || "A"];
-    const r2 = RANK_ORDER[cards2Sorted[i]?.rank || "A"];
-    if (r1 > r2) return 1;
-    if (r1 < r2) return -1;
-  }
+  const high1 = getHighestCard(hand1.cards);
+  const high2 = getHighestCard(hand2.cards);
 
-  return compareSuits(hand1.cards, hand2.cards);
+  const r1 = RANK_ORDER[high1.rank];
+  const r2 = RANK_ORDER[high2.rank];
+  if (r1 > r2) return 1;
+  if (r1 < r2) return -1;
+
+  const s1 = SUIT_ORDER[high1.suit];
+  const s2 = SUIT_ORDER[high2.suit];
+  if (s1 > s2) return 1;
+  if (s1 < s2) return -1;
+
+  return 0;
 }
 
 // Determine winner from multiple hands (returns index of winner)

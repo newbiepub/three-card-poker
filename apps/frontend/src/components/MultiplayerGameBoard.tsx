@@ -17,12 +17,12 @@ import {
 } from "@/store";
 import type { Card as CardType } from "@three-card-poker/shared";
 import { determineWinner, evaluateHand } from "@three-card-poker/shared";
-import { Eye, EyeOff, Trophy, Users } from "lucide-react";
+import { Eye, EyeOff, Trophy, Users, X } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 export const MultiplayerGameBoard: React.FC = () => {
   const { player } = usePlayerStore();
-  const { session } = useRoomStore();
+  const { session, isHost, room } = useRoomStore();
   const { send } = useWebSocketStore();
   const {
     currentRound,
@@ -497,6 +497,23 @@ export const MultiplayerGameBoard: React.FC = () => {
                             (You)
                           </span>
                         )}
+                        {isHost &&
+                          p.id !== player?.id &&
+                          p.id !== room?.hostId && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                send({
+                                  type: "kickPlayer",
+                                  targetPlayerId: p.id,
+                                });
+                              }}
+                              className="p-1 rounded hover:bg-red-100 hover:text-red-500 transition-colors"
+                              title="Kick player"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         Total: {p.totalScore} pts

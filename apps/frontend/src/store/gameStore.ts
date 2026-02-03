@@ -70,6 +70,9 @@ export const useGameStore = create<GameState>((set) => ({
 
   setPlayers: (players) =>
     set((state) => {
+      // Freeze players list if game is over to keep the scoreboard intact
+      if (state.showFinalResult) return state;
+
       const existingPlayersMap = new Map(state.players.map((p) => [p.id, p]));
 
       const updatedPlayers = players.map((p) => {
