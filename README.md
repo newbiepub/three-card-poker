@@ -88,15 +88,25 @@ Three Card Poker (Bài Cào) is played with 2-6 players:
 - Draws are **serialized with a mutex lock** per session to prevent duplicates.
 - The deck is reset automatically when moving to a new round.
 
-## Features
+## Features (v2 Update)
 
-- [x] Basic card dealing and scoring
-- [ ] Room creation and joining
-- [ ] Multiplayer support
-- [ ] Real-time gameplay
-- [ ] Card animations
+The v2 version introduces a complete overhaul of the UI alongside advanced gameplay mechanics:
+
+- **Retro-Futuristic UI**: A fully redesigned synthwave/cyberpunk aesthetic featuring glassmorphism, neon glows, and glitch effects.
+- **Swipe-to-Reveal Interactions**: Tinder-style swipe mechanics requiring authentic gestures to flip the final facedown cards.
+- **Robust Real-Time Multiplayer**: Up to 17 players simultaneously synced over lightweight WebSocket events, keeping full presence tracking.
+- **Auto-Pilot & Offline Ghost Mode**: Players who drop connection won't break the lobby. They enter an offline "Ghost Mode" while a backend Auto-Pilot automatically plays for them until they refresh/reconnect (using a 15s claim timeout + 3s poll logic).
+- **Tie-breaker Rules & Leaderboards**: Complete implementation of hand logic (Sáp, Ba Tiên, Normal/Pair) checking, automatic points calculation (winner-take-all vs losers), tie detection, and scrollable scoreboards.
+- **Interactive Gameplay**: In-game animated sticker overlays across player avatars.
+
+## Core Implementation Features
+
+- [x] Room creation and joining via code sharing
+- [x] Real-time multiplayer synchronization
+- [x] Advanced card dealing, dealing rules, and automated scoring
+- [x] High-end Card animations & UI layout
+- [x] Responsive design for all standard devices
 - [ ] Sound effects
-- [ ] Responsive design
 
 ## Contributing
 
