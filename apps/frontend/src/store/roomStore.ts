@@ -6,6 +6,7 @@ interface RoomState {
   room: Room | null;
   session: Session | null;
   players: Player[];
+  presence: Record<string, "online" | "offline">;
   isHost: boolean;
   currentUserId: string | null;
   setRoom: (
@@ -14,9 +15,15 @@ interface RoomState {
     isHost: boolean,
     currentUserId: string,
     players?: Player[],
+    presence?: Record<string, "online" | "offline">,
   ) => void;
   addPlayer: (player: Player) => void;
   removePlayer: (playerId: string) => void;
+  setPresence: (presence: Record<string, "online" | "offline">) => void;
+  updatePlayerPresence: (
+    playerId: string,
+    status: "online" | "offline",
+  ) => void;
   updateSession: (session: Session) => void;
   clearRoom: () => void;
 }
@@ -25,11 +32,19 @@ export const useRoomStore = create<RoomState>((set) => ({
   room: null,
   session: null,
   players: [],
+  presence: {},
   isHost: false,
   currentUserId: null,
 
-  setRoom: (room, session, isHost, currentUserId, players) => {
-    set({ room, session, isHost, currentUserId, players: players || [] });
+  setRoom: (room, session, isHost, currentUserId, players, presence) => {
+    set({
+      room,
+      session,
+      isHost,
+      currentUserId,
+      players: players || [],
+      presence: presence || {},
+    });
   },
 
   addPlayer: (player) =>
@@ -40,8 +55,20 @@ export const useRoomStore = create<RoomState>((set) => ({
     })),
 
   removePlayer: (playerId) =>
+    set((state) => {
+      const newPresence = { ...state.presence };
+      delete newPresence[playerId];
+      return {
+        players: state.players.filter((p) => p.id !== playerId),
+        presence: newPresence,
+      };
+    }),
+
+  setPresence: (presence) => set({ presence }),
+
+  updatePlayerPresence: (playerId, status) =>
     set((state) => ({
-      players: state.players.filter((p) => p.id !== playerId),
+      presence: { ...state.presence, [playerId]: status },
     })),
 
   updateSession: (session) => set({ session }),
@@ -51,6 +78,7 @@ export const useRoomStore = create<RoomState>((set) => ({
       room: null,
       session: null,
       players: [],
+      presence: {},
       isHost: false,
       currentUserId: null,
     }),

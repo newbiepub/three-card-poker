@@ -41,11 +41,13 @@ three-card-poker/
 ### Development
 
 1. Start the backend server:
+
    ```bash
    bun run --filter backend dev
    ```
 
 2. Start the frontend server (in another terminal):
+
    ```bash
    bun run --filter frontend dev
    ```

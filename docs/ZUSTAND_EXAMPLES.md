@@ -3,10 +3,11 @@
 ## Basic Store Usage
 
 ### 1. Player Store Example
+
 ```typescript
 // store/playerStore.ts
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 interface PlayerState {
   player: Player | null;
@@ -23,12 +24,13 @@ export const usePlayerStore = create<PlayerState>()(
       setPlayer: (player) => set({ player, isAuthenticated: true }),
       logout: () => set({ player: null, isAuthenticated: false }),
     }),
-    { name: 'three-card-poker-player' }
-  )
+    { name: "three-card-poker-player" },
+  ),
 );
 ```
 
 ### 2. Using in Components
+
 ```typescript
 // components/PlayerProfile.tsx
 import { usePlayerStore } from '@/store';
@@ -36,20 +38,20 @@ import { usePlayerStore } from '@/store';
 export function PlayerProfile() {
   // Get all state - re-renders on any change
   const { player, isAuthenticated, logout } = usePlayerStore();
-  
+
   // Selective subscription - only re-renders when player changes
   const player = usePlayerStore(state => state.player);
-  
+
   // Multiple properties with selector
   const { player, isAuthenticated } = usePlayerStore(state => ({
     player: state.player,
     isAuthenticated: state.isAuthenticated
   }));
-  
+
   if (!isAuthenticated) {
     return <PleaseLogin />;
   }
-  
+
   return (
     <div>
       <h1>Welcome, {player.name}!</h1>
@@ -61,10 +63,11 @@ export function PlayerProfile() {
 ```
 
 ### 3. Room Store with Actions
+
 ```typescript
 // store/roomStore.ts
-import { create } from 'zustand';
-import type { Room, Player } from '@/types';
+import { create } from "zustand";
+import type { Room, Player } from "@/types";
 
 interface RoomState {
   room: Room | null;
@@ -80,26 +83,27 @@ export const useRoomStore = create<RoomState>((set, get) => ({
   room: null,
   players: [],
   isHost: false,
-  
+
   setRoom: (room, isHost) => set({ room, isHost }),
-  
-  addPlayer: (player) => 
+
+  addPlayer: (player) =>
     set((state) => ({
-      players: state.players.some(p => p.id === player.id) 
-        ? state.players 
-        : [...state.players, player]
+      players: state.players.some((p) => p.id === player.id)
+        ? state.players
+        : [...state.players, player],
     })),
-  
-  removePlayer: (playerId) => 
+
+  removePlayer: (playerId) =>
     set((state) => ({
-      players: state.players.filter(p => p.id !== playerId)
+      players: state.players.filter((p) => p.id !== playerId),
     })),
-    
+
   clearRoom: () => set({ room: null, players: [], isHost: false }),
 }));
 ```
 
 ### 4. Complex Component with Multiple Stores
+
 ```typescript
 // pages/Game.tsx
 import { usePlayerStore } from '@/store/playerStore';
@@ -109,36 +113,36 @@ import { useGameStore } from '@/store/gameStore';
 export function GamePage() {
   // Player data
   const { player } = usePlayerStore();
-  
+
   // Room data
   const { room, players, isHost } = useRoomStore();
-  
+
   // Game data
-  const { 
-    playerCards, 
-    gamePhase, 
+  const {
+    playerCards,
+    gamePhase,
     setPlayerCards,
-    setGamePhase 
+    setGamePhase
   } = useGameStore();
-  
+
   const handleStartGame = () => {
     if (isHost && gamePhase === 'waiting') {
       setGamePhase('dealing');
       // Deal cards logic here
     }
   };
-  
+
   return (
     <div>
       <h1>{room?.name}</h1>
       <p>Players: {players.length}</p>
-      
+
       {isHost && (
         <button onClick={handleStartGame}>
           Start Game
         </button>
       )}
-      
+
       {playerCards.length > 0 && (
         <Hand cards={playerCards} />
       )}
@@ -148,17 +152,18 @@ export function GamePage() {
 ```
 
 ### 5. Combining with TanStack Query
+
 ```typescript
 // hooks/useGame.ts
-import { useQuery } from '@tanstack/react-query';
-import { useGameStore } from '@/store/gameStore';
-import { apiClient } from '@/api/client';
+import { useQuery } from "@tanstack/react-query";
+import { useGameStore } from "@/store/gameStore";
+import { apiClient } from "@/api/client";
 
 export function useGame(gameId: string) {
   const { setGame, setPlayerCards } = useGameStore();
-  
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ['game', gameId],
+    queryKey: ["game", gameId],
     queryFn: () => apiClient.get(`/games/${gameId}`),
     enabled: !!gameId,
     onSuccess: (data) => {
@@ -167,12 +172,13 @@ export function useGame(gameId: string) {
       setPlayerCards(data.playerCards);
     },
   });
-  
+
   return { data, isLoading, error };
 }
 ```
 
 ### 6. TypeScript Best Practices
+
 ```typescript
 // store/types.ts
 export interface StoreState {
@@ -188,8 +194,8 @@ export interface StoreActions {
 }
 
 // store/exampleStore.ts
-import { create } from 'zustand';
-import type { StoreState, StoreActions } from './types';
+import { create } from "zustand";
+import type { StoreState, StoreActions } from "./types";
 
 type ExampleStore = StoreState & StoreActions;
 
@@ -197,7 +203,7 @@ export const useExampleStore = create<ExampleStore>((set) => ({
   // state
   player: null,
   room: null,
-  
+
   // actions
   setPlayer: (player) => set({ player }),
   clearRoom: () => set({ room: null }),
@@ -212,15 +218,17 @@ export const useExampleStore = create<ExampleStore>((set) => ({
    - Game store for game logic
 
 2. **Use Selectors for Performance**
+
    ```typescript
    // Bad - re-renders on any change
    const { player, room, game } = useStore();
-   
+
    // Good - only re-renders when player changes
-   const player = useStore(state => state.player);
+   const player = useStore((state) => state.player);
    ```
 
 3. **Persist Only What's Needed**
+
    ```typescript
    persist(
      (set) => ({
@@ -230,8 +238,8 @@ export const useExampleStore = create<ExampleStore>((set) => ({
        // Don't persist temporary state
        tempData: [],
      }),
-     { name: 'app-store' }
-   )
+     { name: "app-store" },
+   );
    ```
 
 4. **Combine with Other State Management**
@@ -242,9 +250,10 @@ export const useExampleStore = create<ExampleStore>((set) => ({
 5. **Action Naming Convention**
    ```typescript
    // Use clear, descriptive action names
-   setPlayer: (player) => set({ player })
-   updatePlayerScore: (score) => set(state => ({
-     player: state.player ? { ...state.player, score } : null
-   }))
-   resetGame: () => set(initialState)
+   setPlayer: (player) => set({ player });
+   updatePlayerScore: (score) =>
+     set((state) => ({
+       player: state.player ? { ...state.player, score } : null,
+     }));
+   resetGame: () => set(initialState);
    ```

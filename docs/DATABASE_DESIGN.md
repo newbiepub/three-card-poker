@@ -1,6 +1,7 @@
 # Database Design - Three Card Poker
 
 ## Database Choice
+
 - **Database**: Bun SQLite
 - **ORM**: Drizzle ORM (TypeScript-safe ORM for SQLite)
 - **Location**: Local file storage with backup support
@@ -10,6 +11,7 @@
 ### Tables
 
 #### 1. Players
+
 ```sql
 CREATE TABLE players (
   id TEXT PRIMARY KEY,
@@ -25,6 +27,7 @@ CREATE TABLE players (
 ```
 
 #### 2. Rooms
+
 ```sql
 CREATE TABLE rooms (
   id TEXT PRIMARY KEY,
@@ -38,6 +41,7 @@ CREATE TABLE rooms (
 ```
 
 #### 3. Games
+
 ```sql
 CREATE TABLE games (
   id TEXT PRIMARY KEY,
@@ -54,6 +58,7 @@ CREATE TABLE games (
 ```
 
 #### 4. Game Players
+
 ```sql
 CREATE TABLE game_players (
   id TEXT PRIMARY KEY,
@@ -70,6 +75,7 @@ CREATE TABLE game_players (
 ```
 
 #### 5. Game History
+
 ```sql
 CREATE TABLE game_history (
   id TEXT PRIMARY KEY,
@@ -84,6 +90,7 @@ CREATE TABLE game_history (
 ```
 
 ### Indexes
+
 ```sql
 -- Performance indexes
 CREATE INDEX idx_games_room_id ON games(room_id);
@@ -97,12 +104,14 @@ CREATE INDEX idx_players_total_score ON players(total_score DESC);
 ## Scoring System
 
 ### Point Calculation Rules
+
 - **Base Points**: 5 points per game
 - **Winner**: +5 points × number of losers
 - **Losers**: -5 points each
 - **Tie**: No point changes
 
 ### Examples:
+
 - 2 players: Winner gets +5, loser gets -5
 - 3 players: Winner gets +10, 2 losers get -5 each
 - 4 players: Winner gets +15, 3 losers get -5 each
@@ -110,47 +119,54 @@ CREATE INDEX idx_players_total_score ON players(total_score DESC);
 - 6 players: Winner gets +25, 5 losers get -5 each
 
 ### Score Update Logic
+
 ```typescript
-async function updateGameScores(gameId: string, winnerId: string, loserIds: string[]) {
+async function updateGameScores(
+  gameId: string,
+  winnerId: string,
+  loserIds: string[],
+) {
   const pointsPerLoser = 5;
   const winnerPoints = loserIds.length * pointsPerLoser;
-  
+
   // Update winner
-  await db.update(players)
+  await db
+    .update(players)
     .set({
       total_score: sql`${players.total_score} + ${winnerPoints}`,
       total_wins: sql`${players.total_wins} + 1`,
       total_games: sql`${players.total_games} + 1`,
-      current_streak: sql`${players.current_streak} + 1`
+      current_streak: sql`${players.current_streak} + 1`,
     })
     .where(eq(players.id, winnerId));
-  
+
   // Update losers
   for (const loserId of loserIds) {
-    await db.update(players)
+    await db
+      .update(players)
       .set({
         total_score: sql`${players.total_score} - ${pointsPerLoser}`,
         total_losses: sql`${players.total_losses} + 1`,
         total_games: sql`${players.total_games} + 1`,
-        current_streak: 0
+        current_streak: 0,
       })
       .where(eq(players.id, loserId));
   }
-  
+
   // Record in game_players
   await db.insert(game_players).values([
     {
       game_id: gameId,
       player_id: winnerId,
       score_change: winnerPoints,
-      is_winner: true
+      is_winner: true,
     },
-    ...loserIds.map(loserId => ({
+    ...loserIds.map((loserId) => ({
       game_id: gameId,
       player_id: loserId,
       score_change: -pointsPerLoser,
-      is_winner: false
-    }))
+      is_winner: false,
+    })),
   ]);
 }
 ```
@@ -158,6 +174,7 @@ async function updateGameScores(gameId: string, winnerId: string, loserIds: stri
 ## Database Setup
 
 ### Installation
+
 ```bash
 cd apps/backend
 bun add drizzle-orm better-sqlite3
@@ -165,43 +182,48 @@ bun add -D @types/better-sqlite3 drizzle-kit
 ```
 
 ### Configuration
+
 ```typescript
 // src/db/index.ts
-import Database from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import * as schema from './schema';
+import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import * as schema from "./schema";
 
-export const db = drizzle(Database('poker.db'), { schema });
+export const db = drizzle(Database("poker.db"), { schema });
 ```
 
 ### Migrations
+
 ```typescript
 // drizzle.config.ts
-import type { Config } from 'drizzle-kit';
+import type { Config } from "drizzle-kit";
 
 export default {
-  schema: './src/db/schema.ts',
-  out: './drizzle',
-  driver: 'better-sqlite3',
+  schema: "./src/db/schema.ts",
+  out: "./drizzle",
+  driver: "better-sqlite3",
   dbCredentials: {
-    url: './poker.db'
-  }
+    url: "./poker.db",
+  },
 } satisfies Config;
 ```
 
 ## Data Persistence
 
 ### Game State
+
 - Active games stored in memory for performance
 - Game results persisted to database immediately
 - Player stats updated in real-time
 
 ### Backup Strategy
+
 - Daily automatic backups
 - Manual backup API endpoint
 - Export to JSON format
 
 ### Data Retention
+
 - Game history: Keep last 1000 games per room
 - Player stats: Permanent
 - Room data: Archive after 30 days of inactivity

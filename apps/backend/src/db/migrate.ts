@@ -41,10 +41,8 @@ for (const file of migrationFiles) {
     db.prepare("INSERT INTO __drizzle_migrations (filename) VALUES (?)").run(
       file,
     );
-  } else {
   }
 }
-
 
 // Close connection
 db.close();

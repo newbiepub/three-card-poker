@@ -5,6 +5,34 @@ import { db } from "./src/db/index.ts";
 import { RoomService } from "./src/services/roomService.js";
 import { PlayerService } from "./src/services/playerService.js";
 import { SessionService } from "./src/services/sessionService.js";
+import { PresenceService } from "./src/services/presenceService.js";
+import { AutoPilotService } from "./src/services/autoPilotService.js";
+import { PileService } from "./src/services/pileService.js";
+
+// Initialize AutoPilotService polling with broadcast callback
+AutoPilotService.startPolling(
+  async (sessionId, roundNumber, playerId, cards, score) => {
+    // Need roomCode. SessionId has it.
+    const session = await SessionService.getSessionById(sessionId);
+    if (!session) return;
+    const room = await RoomService.getRoomById(session.roomId);
+    if (!room) return;
+
+    // Emit autoPlayed
+    broadcastToRoom(room.roomCode, {
+      type: "autoPlayed",
+      playerId,
+    });
+
+    // Emit playerScore
+    broadcastToRoom(room.roomCode, {
+      type: "playerScore",
+      playerId,
+      score,
+      cards,
+    });
+  },
+);
 
 // Initialize database connection
 
@@ -16,7 +44,7 @@ const roomConnections = new Map<
 // Store connection info
 const connectionInfo = new Map<
   any,
-  { roomCode: string; playerId: string; playerName: string }
+  { roomCode: string; roomId: string; playerId: string; playerName: string }
 >();
 
 // Broadcast to all players in a room
@@ -36,7 +64,6 @@ function broadcastToRoom(roomCode: string, message: any, excludeWs?: any) {
       } catch (error) {
         console.error("Failed to send message:", error);
       }
-    } else {
     }
   });
 }
@@ -84,7 +111,7 @@ export default {
   fetch(req: Request, server: any) {
     // Check if this is a WebSocket upgrade request
     const url = new URL(req.url);
-    if (req.headers.get("upgrade") === "websocket" && url.pathname === "/") {
+    if (req.headers.get("upgrade") === "websocket" && (url.pathname === "/" || url.pathname === "/ws/")) {
       // Upgrade to WebSocket
       const upgraded = server.upgrade(req);
       if (upgraded) {
@@ -120,6 +147,15 @@ export default {
             break;
           case "kickPlayer":
             await handleKickPlayer(ws, data);
+            break;
+          case "claimPile":
+            await handleClaimPile(ws, data);
+            break;
+          case "sendSticker":
+            await handleSendSticker(ws, data);
+            break;
+          case "heartbeat":
+            await handleHeartbeat(ws, data);
             break;
           default:
             ws.send(
@@ -172,6 +208,14 @@ async function handleJoinRoom(ws: any, data: any) {
     let session = null;
     if (room.currentSession?.id) {
       session = await SessionService.getSessionById(room.currentSession.id);
+      
+      if (session && session.status === "playing") {
+        const presence = await PresenceService.getPresenceMap(room.id);
+        if (!(playerId in presence)) {
+          ws.send(JSON.stringify({ type: "error", message: "Cannot join room. Game is currently in progress." }));
+          return;
+        }
+      }
     }
 
     // Store connection
@@ -200,28 +244,78 @@ async function handleJoinRoom(ws: any, data: any) {
 
     // Add new connection
     roomConns.set(ws, { playerId, playerName: player.name });
-    connectionInfo.set(ws, { roomCode, playerId, playerName: player.name });
+    connectionInfo.set(ws, { roomCode, roomId: room.id, playerId, playerName: player.name });
 
-    // Get all players in the room
+    // Get connected players
     const roomConnectionsList = Array.from(
       roomConnections.get(roomCode)!.values(),
     );
+    const connectedPlayerIds = new Set(roomConnectionsList.map((c) => c.playerId));
 
-    // Get all players including the current one
-    const playersInRoom = await Promise.all(
+    // Get all connected players
+    const connectedPlayers = await Promise.all(
       roomConnectionsList.map(async (conn) => {
         const p = await PlayerService.getPlayerById(conn.playerId);
         return p ? { id: p.id, name: p.name } : null;
       }),
     );
+    
+    let validPlayers: { id: string; name: string }[] = connectedPlayers.filter(
+      (p): p is { id: string; name: string } => p !== null
+    );
 
-    const validPlayers = playersInRoom.filter((p) => p !== null);
+    // During active games, include offline players from presence
+    if (session && session.status === "playing") {
+      const presenceMap = await PresenceService.getPresenceMap(room.id);
+      const offlinePlayerIds = Object.keys(presenceMap).filter(
+        (pid) => !connectedPlayerIds.has(pid)
+      );
+      
+      const offlinePlayers = await Promise.all(
+        offlinePlayerIds.map(async (pid) => {
+          const p = await PlayerService.getPlayerById(pid);
+          return p ? { id: p.id, name: p.name } : null;
+        })
+      );
+      
+      validPlayers = [
+        ...validPlayers,
+        ...offlinePlayers.filter((p): p is { id: string; name: string } => p !== null)
+      ];
+    }
+
+    // Call presence set online
+    await PresenceService.setOnline(room.id, playerId);
+    broadcastToRoom(roomCode, {
+      type: "presenceUpdate",
+      playerId,
+      status: "online",
+    });
+
+    // Clear auto play if there was any
+    if (session) {
+      await AutoPilotService.cancelAutoPlay(
+        session.id,
+        session.currentRound,
+        playerId,
+      );
+    }
+
+    // Get snapshot for reconnect
+    let snapshot = null;
+    if (session && session.status === "playing") {
+      snapshot = await SessionService.getFullStateSnapshot(
+        session.id,
+        roomCode,
+      );
+    }
 
     // Send current room state to the joining player
     const response = {
       type: "roomJoined",
       room,
       session,
+      snapshot,
       players: validPlayers,
       isHost: room.hostId === playerId,
     };
@@ -247,7 +341,7 @@ async function handleLeaveRoom(ws: any, data: any) {
   const info = connectionInfo.get(ws);
   if (!info) return;
 
-  const { roomCode, playerId, playerName } = info;
+  const { roomCode, roomId, playerId, playerName } = info;
 
   // Remove from room connections
   const connections = roomConnections.get(roomCode);
@@ -292,7 +386,18 @@ async function handleStartGame(ws: any, data: any) {
       return;
     }
 
-    await SessionService.startSession(sessionId);
+    // Get room players to pass to startSession
+    const room = await RoomService.getRoomById(roomCode);
+
+    // Instead of querying players table, we should query room_players or connections.
+    // wait, we can just get from roomConnections! We did that above:
+    const roomConnectionsList = Array.from(
+      roomConnections.get(roomCode)?.values() || [],
+    );
+
+    const playerIds = roomConnectionsList.map((c) => c.playerId);
+
+    await SessionService.startSession(sessionId, playerIds.length, playerIds);
 
     // Broadcast game start to all players in room
     broadcastToRoom(roomCode, {
@@ -300,6 +405,18 @@ async function handleStartGame(ws: any, data: any) {
       sessionId,
       gameId: "game-" + Math.random().toString(36).substr(2, 9),
     });
+
+    // We can also let clients know piles are ready
+    const sessionItems = await SessionService.getFullStateSnapshot(
+      sessionId,
+      roomCode,
+    );
+    if (sessionItems && sessionItems.piles) {
+      broadcastToRoom(roomCode, {
+        type: "pilesRevealed",
+        piles: sessionItems.piles,
+      });
+    }
   } catch (error) {
     console.error("Failed to start game:", error);
     ws.send(JSON.stringify({ type: "error", message: "Failed to start game" }));
@@ -335,13 +452,27 @@ async function handleNextRound(ws: any, data: any) {
     type: "nextRound",
     round: data.round,
   });
+
+  const room = await RoomService.getRoomByCode(roomCode);
+  if (room && room.currentSessionId) {
+    const sessionItems = await SessionService.getFullStateSnapshot(
+      room.currentSessionId,
+      roomCode,
+    );
+    if (sessionItems && sessionItems.piles) {
+      broadcastToRoom(roomCode, {
+        type: "pilesRevealed",
+        piles: sessionItems.piles,
+      });
+    }
+  }
 }
 
 function handleDisconnect(ws: any) {
   const info = connectionInfo.get(ws);
   if (!info) return;
 
-  const { roomCode, playerId, playerName } = info;
+  const { roomCode, playerId, playerName, roomId } = info;
 
   // Remove from room connections
   const connections = roomConnections.get(roomCode);
@@ -359,6 +490,28 @@ function handleDisconnect(ws: any) {
     playerId,
     playerName,
     totalPlayers: connections?.size || 0,
+  });
+
+  PresenceService.setOffline(roomId, playerId);
+  broadcastToRoom(roomCode, {
+    type: "presenceUpdate",
+    playerId,
+    status: "offline",
+  });
+
+  // Provide auto playlist if a game is going on
+  RoomService.getRoomByCode(roomCode).then((room) => {
+    if (room && room.currentSessionId) {
+      SessionService.getSessionById(room.currentSessionId).then((session) => {
+        if (session && session.status === "playing") {
+          AutoPilotService.scheduleAutoPlay(
+            session.id,
+            session.currentRound,
+            playerId!,
+          );
+        }
+      });
+    }
   });
 }
 
@@ -449,5 +602,78 @@ async function handleKickPlayer(ws: any, data: any) {
     ws.send(
       JSON.stringify({ type: "error", message: "Failed to kick player" }),
     );
+  }
+}
+
+async function handleClaimPile(ws: any, data: any) {
+  const info = connectionInfo.get(ws);
+  if (!info) return;
+
+  const { roomCode, playerId } = info;
+  const { sessionId, roundNumber, pileId } = data;
+
+  try {
+    const pile = await PileService.claimPile(
+      sessionId,
+      roundNumber,
+      pileId,
+      playerId,
+    );
+    await AutoPilotService.cancelAutoPlay(sessionId, roundNumber, playerId);
+
+    broadcastToRoom(roomCode, {
+      type: "pileClaimed",
+      pileId,
+      playerId,
+      cards: JSON.parse(pile.cards),
+    });
+  } catch (error) {
+    ws.send(
+      JSON.stringify({
+        type: "error",
+        message:
+          error instanceof Error ? error.message : "Failed to claim pile",
+      }),
+    );
+  }
+}
+
+async function handleSendSticker(ws: any, data: any) {
+  const info = connectionInfo.get(ws);
+  if (!info) return;
+
+  const { roomCode, playerId } = info;
+  const { sticker } = data;
+
+  broadcastToRoom(roomCode, {
+    type: "stickerSent",
+    playerId,
+    sticker,
+  });
+}
+
+async function handleHeartbeat(ws: any, data: any) {
+  const info = connectionInfo.get(ws);
+  if (!info) return;
+
+  const { roomCode, roomId, playerId } = info;
+  await PresenceService.setOnline(roomId, playerId);
+  broadcastToRoom(roomCode, {
+    type: "presenceUpdate",
+    playerId,
+    status: "online",
+  });
+
+  // Maybe also reset auto play
+  const room = await RoomService.getRoomByCode(roomCode);
+  if (room && room.currentSession) {
+    const session = await SessionService.getSessionById(room.currentSession.id);
+    if (session && session.status === "playing") {
+      await AutoPilotService.cancelAutoPlay(
+        session.id,
+        session.currentRound,
+        playerId,
+      );
+    }
   }
 }

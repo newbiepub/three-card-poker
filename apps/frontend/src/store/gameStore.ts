@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Player, Card } from "@three-card-poker/shared";
+import type { Player, Card, Pile, StickerMeta } from "@three-card-poker/shared";
 
 export interface GamePlayer extends Player {
   hand: Card[];
@@ -19,6 +19,8 @@ interface GameState {
   gameWinner: GamePlayer | null;
   showRoundResult: boolean;
   showFinalResult: boolean;
+  piles: Pile[];
+  stickers: (StickerMeta & { id: string })[];
 
   setGameState: (status: GameState["gameStatus"]) => void;
   setCurrentRound: (round: number) => void;
@@ -50,6 +52,10 @@ interface GameState {
   resetGame: () => void;
   setShowRoundResult: (show: boolean) => void;
   setShowFinalResult: (show: boolean) => void;
+  setPiles: (piles: Pile[]) => void;
+  claimPile: (pileId: string, playerId: string, cards?: Card[]) => void;
+  addSticker: (playerId: string, sticker: string) => void;
+  removeSticker: (id: string) => void;
 }
 
 export const useGameStore = create<GameState>((set) => ({
@@ -61,6 +67,8 @@ export const useGameStore = create<GameState>((set) => ({
   gameWinner: null,
   showRoundResult: false,
   showFinalResult: false,
+  piles: [],
+  stickers: [],
 
   setGameState: (status) => set({ gameStatus: status }),
 
@@ -190,11 +198,24 @@ export const useGameStore = create<GameState>((set) => ({
       const nextRoundNum = roundNumber ?? state.currentRound + 1;
       const isGameEnd = nextRoundNum > state.totalRounds;
 
-      const winner = isGameEnd
-        ? state.players.reduce((prev, current) =>
-            prev.cumulatedScore > current.cumulatedScore ? prev : current,
-          )
-        : null;
+      // Determine winner only if there's a clear winner (no tie)
+      let winner: GamePlayer | null = null;
+      if (isGameEnd && state.players.length > 0) {
+        const sortedPlayers = [...state.players].sort(
+          (a, b) => b.cumulatedScore - a.cumulatedScore,
+        );
+
+        // Check for tie — if top players share the same score, no winner
+        const topScore = sortedPlayers[0].cumulatedScore;
+        const tiedPlayers = sortedPlayers.filter(
+          (p) => p.cumulatedScore === topScore,
+        );
+
+        if (tiedPlayers.length === 1) {
+          winner = sortedPlayers[0];
+        }
+        // If tiedPlayers.length > 1, winner stays null (no winner display)
+      }
 
       return {
         currentRound: nextRoundNum,
@@ -211,6 +232,8 @@ export const useGameStore = create<GameState>((set) => ({
         showRoundResult: false,
         showFinalResult: isGameEnd,
         gameWinner: winner,
+        piles: [],
+        stickers: [],
       };
     }),
 
@@ -223,10 +246,55 @@ export const useGameStore = create<GameState>((set) => ({
       gameWinner: null,
       showRoundResult: false,
       showFinalResult: false,
+      piles: [],
+      stickers: [],
     });
   },
 
   setShowRoundResult: (show) => set({ showRoundResult: show }),
 
   setShowFinalResult: (show) => set({ showFinalResult: show }),
+
+  setPiles: (piles) => set({ piles }),
+
+  claimPile: (pileId, playerId, cards) =>
+    set((state) => {
+      const updatedPiles = state.piles.map((p) =>
+        p.id === pileId
+          ? {
+              ...p,
+              claimedBy: playerId,
+              claimedAt: Date.now(),
+              cards: cards || p.cards,
+            }
+          : p,
+      );
+
+      // If cards are provided (meaning they just claimed it), update player hand
+      let updatedPlayers = state.players;
+      if (cards) {
+        updatedPlayers = state.players.map((p) =>
+          p.id === playerId ? { ...p, hand: cards } : p,
+        );
+      }
+
+      return { piles: updatedPiles, players: updatedPlayers };
+    }),
+
+  addSticker: (playerId, sticker) =>
+    set((state) => {
+      const newSticker = {
+        id: Math.random().toString(36).substring(2, 9),
+        playerId,
+        sticker,
+        timestamp: Date.now(),
+      };
+
+      return { stickers: [...state.stickers, newSticker] };
+    }),
+
+  removeSticker: (id) =>
+    set((state) => ({
+      stickers: state.stickers.filter((s) => s.id !== id),
+    })),
 }));

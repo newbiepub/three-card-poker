@@ -1,11 +1,13 @@
 # Room Management System
 
 ## Overview
+
 Enhanced room system with host controls, 6-digit room codes, and session-based gameplay.
 
 ## Player Registration
 
 ### Local Storage
+
 ```typescript
 // Player data stored in localStorage
 interface PlayerData {
@@ -16,10 +18,11 @@ interface PlayerData {
 }
 
 // Storage key
-const PLAYER_STORAGE_KEY = 'three-card-poker-player';
+const PLAYER_STORAGE_KEY = "three-card-poker-player";
 ```
 
 ### Name Entry Flow
+
 1. **First Time Players**:
    - Prompt for name on app load
    - Generate unique player ID
@@ -34,6 +37,7 @@ const PLAYER_STORAGE_KEY = 'three-card-poker-player';
 ## Room System
 
 ### Room Code Format
+
 - **Format**: 6-digit numeric code (e.g., "123456")
 - **Generation**: Random 6-digit number
 - **Validation**: Check for duplicates before assigning
@@ -41,6 +45,7 @@ const PLAYER_STORAGE_KEY = 'three-card-poker-player';
 ### Room Roles
 
 #### Host (Room Creator)
+
 - Creates room with custom settings
 - Sets number of rounds per session
 - Controls game flow
@@ -48,6 +53,7 @@ const PLAYER_STORAGE_KEY = 'three-card-poker-player';
 - Manages player permissions
 
 #### Player (Room Joiner)
+
 - Joins with room code
 - Waits for host to start
 - Participates in all rounds
@@ -56,6 +62,7 @@ const PLAYER_STORAGE_KEY = 'three-card-poker-player';
 ### Session Management
 
 #### Game Session Structure
+
 ```typescript
 interface GameSession {
   roomId: string;
@@ -63,7 +70,7 @@ interface GameSession {
   totalRounds: number;
   currentRound: number;
   scores: RoundScore[];
-  status: 'waiting' | 'playing' | 'finished';
+  status: "waiting" | "playing" | "finished";
   startTime: Date;
   endTime?: Date;
 }
@@ -79,6 +86,7 @@ interface RoundScore {
 ```
 
 #### Session Flow
+
 1. **Host Setup**:
    - Creates room
    - Sets number of rounds (1-20)
@@ -98,6 +106,7 @@ interface RoundScore {
 ## Database Schema Updates
 
 ### Sessions Table
+
 ```sql
 CREATE TABLE sessions (
   id TEXT PRIMARY KEY,
@@ -114,6 +123,7 @@ CREATE TABLE sessions (
 ```
 
 ### Session Scores Table
+
 ```sql
 CREATE TABLE session_scores (
   id TEXT PRIMARY KEY,
@@ -129,6 +139,7 @@ CREATE TABLE session_scores (
 ```
 
 ### Updated Rooms Table
+
 ```sql
 ALTER TABLE rooms ADD COLUMN room_code TEXT UNIQUE NOT NULL;
 ALTER TABLE rooms ADD COLUMN host_id TEXT NOT NULL;
@@ -138,6 +149,7 @@ ALTER TABLE rooms ADD COLUMN current_session_id TEXT NULL;
 ## API Endpoints
 
 ### Player Management
+
 ```typescript
 POST /api/players/register
 {
@@ -159,6 +171,7 @@ Response: {
 ```
 
 ### Room Management
+
 ```typescript
 POST /api/rooms/create
 {
@@ -194,6 +207,7 @@ Response: {
 ```
 
 ### Session Control
+
 ```typescript
 POST /api/sessions/:sessionId/start
 {
@@ -221,6 +235,7 @@ Response: {
 ## UI Components
 
 ### Name Entry Modal
+
 ```tsx
 interface NameEntryModalProps {
   onSubmit: (name: string) => void;
@@ -235,6 +250,7 @@ interface NameEntryModalProps {
 ```
 
 ### Room Code Input
+
 ```tsx
 interface RoomCodeInputProps {
   onJoin: (code: string) => void;
@@ -249,6 +265,7 @@ interface RoomCodeInputProps {
 ```
 
 ### Host Control Panel
+
 ```tsx
 interface HostControlsProps {
   session: GameSession;
@@ -266,6 +283,7 @@ interface HostControlsProps {
 ```
 
 ### Session Scoreboard
+
 ```tsx
 interface SessionScoreboardProps {
   session: GameSession;
@@ -282,42 +300,46 @@ interface SessionScoreboardProps {
 ## WebSocket Events
 
 ### Room Events
+
 ```typescript
 // Client -> Server
 interface RoomEvents {
-  'room:create': { hostName: string; totalRounds: number };
-  'room:join': { roomCode: string; playerName: string };
-  'room:leave': { roomId: string };
-  'room:start': { sessionId: string };
-  'room:next-round': { sessionId: string };
-  'room:reset': { sessionId: string; newRounds?: number };
+  "room:create": { hostName: string; totalRounds: number };
+  "room:join": { roomCode: string; playerName: string };
+  "room:leave": { roomId: string };
+  "room:start": { sessionId: string };
+  "room:next-round": { sessionId: string };
+  "room:reset": { sessionId: string; newRounds?: number };
 }
 
 // Server -> Client
 interface RoomResponses {
-  'room:created': { room: Room; roomCode: string };
-  'room:joined': { room: Room; players: Player[] };
-  'room:player-joined': { player: Player };
-  'room:player-left': { playerId: string };
-  'room:session-started': { session: GameSession };
-  'room:round-changed': { roundNumber: number };
-  'room:session-reset': { session: GameSession };
+  "room:created": { room: Room; roomCode: string };
+  "room:joined": { room: Room; players: Player[] };
+  "room:player-joined": { player: Player };
+  "room:player-left": { playerId: string };
+  "room:session-started": { session: GameSession };
+  "room:round-changed": { roundNumber: number };
+  "room:session-reset": { session: GameSession };
 }
 ```
 
 ## Implementation Notes
 
 ### Security
+
 - Host validation for sensitive actions
 - Room code expiration after inactivity
 - Player authentication via tokens
 
 ### Performance
+
 - Session data in memory during play
 - Batch database writes at session end
 - Optimized leaderboard queries
 
 ### UX Considerations
+
 - Clear host indicators
 - Visual round progression
 - Smooth score animations

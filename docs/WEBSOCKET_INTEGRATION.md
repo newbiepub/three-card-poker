@@ -1,11 +1,13 @@
 # WebSocket Integration
 
 ## Overview
+
 The Three Card Poker app uses WebSockets for real-time communication between players in a room. This enables instant updates when players join/leave, game state changes, and other multiplayer features.
 
 ## Backend Configuration
 
 ### Required WebSocket Setup
+
 For WebSocket support in Bun, you must include the `websocket` object in your server configuration:
 
 ```typescript
@@ -24,13 +26,14 @@ export default {
       // WebSocket close event will be handled by Hono
     },
     error: (ws, error) => {
-      console.error('WebSocket error:', error)
-    }
-  }
-}
+      console.error("WebSocket error:", error);
+    },
+  },
+};
 ```
 
 **Important**: Without this websocket configuration, attempting to connect will result in:
+
 ```
 TypeError: To enable websocket support, set the "websocket" object in Bun.serve({})
 ```
@@ -38,6 +41,7 @@ TypeError: To enable websocket support, set the "websocket" object in Bun.serve(
 ## Architecture
 
 ### Frontend WebSocket Store
+
 ```typescript
 // store/websocketStore.ts
 interface WebSocketState {
@@ -51,6 +55,7 @@ interface WebSocketState {
 ```
 
 ### Backend WebSocket Handler
+
 ```typescript
 // websocket/gameWebSocket.ts
 - Handles room connections
@@ -62,6 +67,7 @@ interface WebSocketState {
 ## WebSocket Events
 
 ### Client → Server
+
 ```typescript
 // Join a room
 {
@@ -94,6 +100,7 @@ interface WebSocketState {
 ```
 
 ### Server → Client
+
 ```typescript
 // Room joined successfully
 {
@@ -142,6 +149,7 @@ interface WebSocketState {
 ## Usage Example
 
 ### Connecting to a Room
+
 ```typescript
 // In your Room component
 import { useWebSocketStore } from '@/store';
@@ -176,6 +184,7 @@ function RoomPage() {
 ```
 
 ### Handling WebSocket Events
+
 ```typescript
 // The WebSocket store automatically updates Zustand stores
 // based on received events:
@@ -187,6 +196,7 @@ function RoomPage() {
 ```
 
 ### Sending Messages
+
 ```typescript
 import { useWebSocketStore } from '@/store';
 
@@ -212,6 +222,7 @@ function GameControls() {
 ## Connection Status
 
 The app includes a `ConnectionStatus` component that shows:
+
 - Green when connected
 - Red when there's an error
 - Gray when connecting/disconnected
@@ -240,16 +251,19 @@ function App() {
 ## Implementation Details
 
 ### Connection URL
+
 ```typescript
 const wsUrl = `ws://localhost:3001/ws?roomCode=${roomCode}&playerId=${playerId}`;
 ```
 
 ### Room Management
+
 - Backend tracks connections by room code
 - Each room maintains its own connection list
 - Broadcasts are sent to all connected players in a room
 
 ### Performance
+
 - Connections are cleaned up when players leave
 - Failed sends are caught and logged
 - Room data is cached to reduce database queries
@@ -257,14 +271,17 @@ const wsUrl = `ws://localhost:3001/ws?roomCode=${roomCode}&playerId=${playerId}`
 ## Troubleshooting
 
 ### Common Issues
+
 1. **Connection Fails**: Check if the backend is running on port 3001
 2. **Events Not Received**: Verify the room code matches
 3. **Player Count Wrong**: Ensure all players connect with unique IDs
 
 ### Debug Mode
+
 Enable console logging to see WebSocket events:
+
 ```typescript
 // In websocketStore.ts
-console.log('WebSocket connected');
-console.log('Received event:', data);
+console.log("WebSocket connected");
+console.log("Received event:", data);
 ```

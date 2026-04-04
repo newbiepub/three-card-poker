@@ -22,8 +22,11 @@ import {
   evaluateHand,
   determineWinner,
 } from "@three-card-poker/shared";
-import type { Card, HandResult } from "@three-card-poker/shared";
+import type { Card, HandResult, Pile } from "@three-card-poker/shared";
 import { RoomService } from "./roomService";
+import { PileService } from "./pileService";
+import { AutoPilotService } from "./autoPilotService";
+import { PresenceService } from "./presenceService";
 
 export interface SessionScoreData {
   playerId: string;
@@ -187,16 +190,29 @@ export class SessionService {
   }
 
   // Start a session
-  static async startSession(sessionId: string): Promise<void> {
+  static async startSession(
+    sessionId: string,
+    playerCount: number,
+    playerIds: string[],
+  ): Promise<void> {
     await db
       .update(sessions)
-      .set({ status: "playing" })
+      .set({ status: "playing", totalRounds: playerCount })
       .where(eq(sessions.id, sessionId));
+
+    await PileService.generatePiles(sessionId, 1, playerCount);
+
+    // Schedule auto-plays
+    for (const playerId of playerIds) {
+      await AutoPilotService.scheduleAutoPlay(sessionId, 1, playerId);
+    }
   }
 
   // Move to next round
   static async nextRound(
     sessionId: string,
+    playerCount: number,
+    playerIds: string[],
   ): Promise<{ currentRound: number; isFinalRound: boolean }> {
     const [session] = await db
       .select()
@@ -205,8 +221,14 @@ export class SessionService {
 
     if (!session) throw new Error("Session not found");
 
-    const nextRound = session.currentRound + 1;
-    const isFinalRound = nextRound > session.totalRounds;
+    // Cancel any pending auto plays from previous round
+    await AutoPilotService.cancelRoundAutoPlays(
+      sessionId,
+      session.currentRound,
+    );
+
+    const nextRoundNum = session.currentRound + 1;
+    const isFinalRound = nextRoundNum > session.totalRounds;
 
     if (isFinalRound) {
       // End the session
@@ -221,11 +243,22 @@ export class SessionService {
       // Update current round
       await db
         .update(sessions)
-        .set({ currentRound: nextRound })
+        .set({ currentRound: nextRoundNum })
         .where(eq(sessions.id, sessionId));
+
+      await PileService.generatePiles(sessionId, nextRoundNum, playerCount);
+
+      // Schedule auto-plays for new round
+      for (const playerId of playerIds) {
+        await AutoPilotService.scheduleAutoPlay(
+          sessionId,
+          nextRoundNum,
+          playerId,
+        );
+      }
     }
 
-    return { currentRound: nextRound, isFinalRound };
+    return { currentRound: nextRoundNum, isFinalRound };
   }
 
   // Add round scores
@@ -300,112 +333,16 @@ export class SessionService {
     return history;
   }
 
-  static async resetDeckForRound(
+  // Auto-play score execution
+  static async autoPlayScoreExecution(
     sessionId: string,
     roundNumber: number,
-  ): Promise<void> {
-    const deck = shuffle(createDeck());
-    const payload: NewSessionDeck = {
-      id: `${sessionId}-${roundNumber}`,
-      sessionId,
-      roundNumber,
-      remainingCards: JSON.stringify(deck),
-    };
-
-    const existingDeck = await db
-      .select()
-      .from(sessionDecks)
-      .where(eq(sessionDecks.id, payload.id))
-      .limit(1);
-
-    if (existingDeck.length > 0) {
-      await db
-        .update(sessionDecks)
-        .set({ remainingCards: payload.remainingCards, createdAt: new Date() })
-        .where(eq(sessionDecks.id, payload.id));
-      return;
-    }
-
-    await db.insert(sessionDecks).values(payload);
-  }
-
-  static async drawCardForRound(
-    sessionId: string,
-    roundNumber: number,
-  ): Promise<{ card: Card; remaining: number }> {
-    const deckId = `${sessionId}-${roundNumber}`;
-    const deckRow = await db
-      .select()
-      .from(sessionDecks)
-      .where(eq(sessionDecks.id, deckId))
-      .limit(1);
-
-    if (deckRow.length === 0) {
-      await this.resetDeckForRound(sessionId, roundNumber);
-      return this.drawCardForRound(sessionId, roundNumber);
-    }
-
-    const deckRecord = deckRow[0];
-    if (!deckRecord) {
-      throw new Error("Deck not found");
-    }
-    const remainingCards = JSON.parse(deckRecord.remainingCards) as Card[];
-    const card = remainingCards.shift();
-
-    if (!card) {
-      throw new Error("No cards remaining");
-    }
-
-    await db
-      .update(sessionDecks)
-      .set({ remainingCards: JSON.stringify(remainingCards) })
-      .where(eq(sessionDecks.id, deckId));
-
-    return { card, remaining: remainingCards.length };
-  }
-
-  static async appendPlayerCard(
-    sessionId: string,
     playerId: string,
-    roundNumber: number,
-    card: Card,
-  ): Promise<{ hand: Card[]; score: number | null }> {
-    const handId = `${sessionId}-${roundNumber}-${playerId}`;
-    const existingHand = await db
-      .select()
-      .from(sessionHands)
-      .where(eq(sessionHands.id, handId))
-      .limit(1);
-
-    const existingHandRecord = existingHand[0];
-    const cards = existingHandRecord
-      ? (JSON.parse(existingHandRecord.cards) as Card[])
-      : [];
-
-    const updatedCards = [...cards, card];
-
-    if (existingHand.length > 0) {
-      await db
-        .update(sessionHands)
-        .set({ cards: JSON.stringify(updatedCards), updatedAt: new Date() })
-        .where(eq(sessionHands.id, handId));
-    } else {
-      const payload: NewSessionHand = {
-        id: handId,
-        sessionId,
-        playerId,
-        roundNumber,
-        cards: JSON.stringify(updatedCards),
-      };
-      await db.insert(sessionHands).values(payload);
-    }
-
-    if (updatedCards.length < 3) {
-      return { hand: updatedCards, score: null };
-    }
-
-    const score = calculateScore(updatedCards);
-    return { hand: updatedCards, score };
+    cards: Card[],
+  ): Promise<number> {
+    const score = calculateScore(cards);
+    await this.savePlayerHand(sessionId, playerId, roundNumber, cards, score);
+    return score;
   }
 
   // Reset session (create new session for same room)
@@ -651,5 +588,38 @@ export class SessionService {
       .returning();
     if (!savedScore) throw new Error("Failed to save hand");
     return savedScore;
+  }
+
+  // Get full state snapshot for reconnects
+  static async getFullStateSnapshot(sessionId: string, roomId: string) {
+    const session = await this.getSessionById(sessionId);
+    if (!session) return null;
+
+    const currentRound = session.currentRound;
+
+    // Convert to Pile[]
+    const sessionPilesData = await PileService.getRoundPiles(
+      sessionId,
+      currentRound,
+    );
+    const piles: Pile[] = sessionPilesData.map((p) => ({
+      id: `pile-${p.pileIndex}`,
+      cards: JSON.parse(p.cards) as Card[],
+      claimedBy: p.claimedBy,
+      claimedAt: p.claimedAt ? new Date(p.claimedAt).getTime() : null,
+    }));
+
+    const scores = await this.getRoundScores(sessionId, currentRound);
+    const allScores = await this.getAllPlayerScores(sessionId);
+    const presence = await PresenceService.getPresenceMap(roomId);
+
+    return {
+      session,
+      currentRound,
+      piles,
+      scores,
+      allScores,
+      presence,
+    };
   }
 }

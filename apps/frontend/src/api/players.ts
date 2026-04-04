@@ -41,6 +41,12 @@ export function usePlayer(name: string) {
   });
 }
 
+export async function verifyPlayer(playerId: string) {
+  return apiClient.get<{ exists: boolean; player?: PlayerProfile }>(
+    `/players/verify/${encodeURIComponent(playerId)}`,
+  );
+}
+
 export function usePlayerHistory(playerId: string, limit = 20) {
   return useQuery({
     queryKey: queryKeys.players.history(playerId, limit),

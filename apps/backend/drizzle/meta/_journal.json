@@ -36,6 +36,13 @@
       "when": 1768934551664,
       "tag": "0004_careful_thunderbird",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1775118448166,
+      "tag": "0005_eager_angel",
+      "breakpoints": true
     }
   ]
 }

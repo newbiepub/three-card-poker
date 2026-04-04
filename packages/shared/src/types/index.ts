@@ -48,6 +48,24 @@ export interface Player {
   isDealer?: boolean;
 }
 
+// Pile types
+export interface Pile {
+  id: string;
+  cards: Card[];
+  claimedBy: string | null;
+  claimedAt: number | null;
+}
+
+// Player presence
+export type PlayerPresence = "online" | "offline";
+
+// Sticker metadata
+export interface StickerMeta {
+  id: string;
+  name: string;
+  src: string;
+}
+
 // Room types
 export interface Room {
   id: string;
@@ -89,6 +107,9 @@ export interface ClientToServerEvents {
   revealCards: { cards: Card[] };
   placeBet: { amount: number };
   playerReady: {};
+  claimPile: { sessionId: string; pileId: string; playerId: string };
+  sendSticker: { stickerId: string; playerId: string };
+  heartbeat: { playerId: string };
 }
 
 export interface ServerToClientEvents {
@@ -102,6 +123,27 @@ export interface ServerToClientEvents {
   error: { message: string };
   playerJoined: { player: Player };
   playerLeft: { playerId: string };
+  pilesRevealed: { piles: Pile[] };
+  pileClaimed: { pileId: string; playerId: string };
+  pileRejected: { pileId: string; reason: string };
+  handRevealed: { playerId: string; cards: Card[]; score: number };
+  scorePublished: {
+    playerId: string;
+    score: number;
+    pointsChange: number;
+    cumulativeScore: number;
+  };
+  stickerSent: { playerId: string; stickerId: string };
+  presenceUpdate: { playerId: string; status: PlayerPresence };
+  autoPlayed: { playerId: string; pileId: string; score: number };
+  reconnectState: {
+    session: any;
+    currentRound: number;
+    piles: Pile[];
+    scores: any[];
+    allScores: any[];
+    presence: Record<string, PlayerPresence>;
+  };
 }
 
 // API Response types

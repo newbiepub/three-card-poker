@@ -49,7 +49,7 @@ export function RoundResultModal({
         transition={{ type: "spring", damping: 25, stiffness: 200 }}
         className="w-full max-w-2xl"
       >
-        <Card className="relative overflow-hidden glass-card border-primary/20 shadow-2xl">
+        <Card className="relative overflow-hidden glass-dark border-primary/30 rounded-3xl">
           <div className="p-8">
             {/* Winner Section */}
             <div className="text-center mb-8">
@@ -59,7 +59,7 @@ export function RoundResultModal({
                 animate={{ rotate: 0, scale: 1 }}
                 transition={{ delay: 0.2, type: "spring" }}
               >
-                <Trophy className="w-16 h-16 mx-auto text-yellow-500 drop-shadow-lg" />
+                <Trophy className="w-16 h-16 mx-auto text-yellow-400 drop-shadow-[0_0_20px_rgba(250,204,21,0.6)]" />
                 {showConfetti && (
                   <motion.div
                     initial={{ opacity: 0 }}
@@ -75,7 +75,7 @@ export function RoundResultModal({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.3 }}
-                className="text-3xl font-bold mb-4 font-heading tracking-tight"
+                className="text-3xl font-bold mb-4 font-heading tracking-tight text-white drop-shadow-[0_0_12px_rgba(234,88,12,0.6)] glitch-text"
               >
                 ROUND {currentRound} WINNER
               </motion.h2>
@@ -86,15 +86,15 @@ export function RoundResultModal({
                 transition={{ delay: 0.4 }}
                 className="flex flex-col items-center gap-3"
               >
-                <div className="flex items-center gap-3 px-6 py-2 rounded-full bg-primary/10 border border-primary/20">
-                  <Crown className="w-6 h-6 text-yellow-500" />
-                  <span className="text-2xl font-bold text-primary font-heading">
+                <div className="flex items-center gap-3 px-6 py-2 rounded-full bg-primary/10 border border-primary/30 neon-border-glow">
+                  <Crown className="w-6 h-6 text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.5)]" />
+                  <span className="text-2xl font-bold text-white drop-shadow-[0_0_8px_rgba(13,148,136,0.8)] font-heading">
                     {roundWinner?.name}
                   </span>
-                  <Crown className="w-6 h-6 text-yellow-500" />
+                  <Crown className="w-6 h-6 text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.5)]" />
                 </div>
 
-                <div className="text-4xl font-black text-accent font-heading">
+                <div className="text-4xl font-black text-accent font-heading flicker drop-shadow-[0_0_12px_rgba(234,88,12,0.5)]">
                   {roundWinner?.score || 0} POINTS
                 </div>
               </motion.div>
@@ -115,16 +115,16 @@ export function RoundResultModal({
                       transition={{ delay: 0.5 + index * 0.1 }}
                       className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
                         index === 0
-                          ? "bg-accent/5 border-accent/20 shadow-md"
-                          : "bg-background/50 border-border"
+                          ? "bg-yellow-500/10 border-yellow-500/30 neon-border-glow-accent"
+                          : "bg-slate-800/50 border-slate-700/50"
                       }`}
                     >
                       <div className="flex items-center gap-4">
                         <span
                           className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold font-heading ${
                             index === 0
-                              ? "bg-accent text-white"
-                              : "bg-muted text-muted-foreground"
+                              ? "bg-yellow-500 text-slate-900"
+                              : "bg-slate-700 text-slate-300"
                           }`}
                         >
                           {index + 1}
@@ -132,7 +132,7 @@ export function RoundResultModal({
 
                         <div className="flex flex-col">
                           <div className="flex items-center gap-2">
-                            <span className="font-bold font-heading">
+                            <span className="font-bold font-heading text-white">
                               {player.name}
                             </span>
                             {player.hand && player.hand.length === 3 && (
@@ -218,7 +218,7 @@ export function RoundResultModal({
               <Button
                 onClick={onNextRound}
                 disabled={isPending}
-                className="w-full h-16 text-lg gaming-button"
+              className="w-full h-16 text-lg neon-border-glow-accent neon-pulse bg-accent hover:bg-accent/90 text-white"
               >
                 {isPending ? (
                   <span className="flex items-center gap-3">

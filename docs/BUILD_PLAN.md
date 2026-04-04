@@ -1,11 +1,13 @@
 # Three Card Poker - Build Plan
 
 ## Project Overview
+
 A real-time Three Card Poker (Bài Cào) game application supporting 2-6 players per room with WebSocket-based real-time gameplay.
 
 ## Tech Stack
+
 - **Runtime**: Bun
-- **Frontend**: 
+- **Frontend**:
   - **React 19** with TypeScript
   - **Vite** for build tooling
   - **Tailwind CSS v4** for styling with custom design system
@@ -93,6 +95,7 @@ three-card-poker/
 ## Installation Steps
 
 ### 1. Initialize Bun Workspace
+
 ```bash
 # Create root package.json
 {
@@ -111,6 +114,7 @@ three-card-poker/
 ```
 
 ### 2. Setup Backend (Hono)
+
 ```bash
 cd apps/backend
 bun init
@@ -122,6 +126,7 @@ bun add -D @types/node typescript bun-types @types/better-sqlite3 drizzle-kit
 ```
 
 ### 2.1. Setup Database
+
 ```bash
 # Initialize Drizzle
 bunx drizzle-kit generate
@@ -133,6 +138,7 @@ bunx drizzle-kit migrate
 ```
 
 ### 3. Setup Frontend (React + Vite)
+
 ```bash
 cd apps/frontend
 bun create vite . --template react-ts
@@ -145,6 +151,7 @@ bun add -D @types/node
 ```
 
 ### 4. Setup shadcn/ui
+
 ```bash
 cd apps/frontend
 bun dlx shadcn@latest init
@@ -154,6 +161,7 @@ bun dlx shadcn@latest add button card input label badge avatar
 ```
 
 ### 5. Setup Shared Packages
+
 ```bash
 # Create shared types package
 cd packages/shared
@@ -175,25 +183,24 @@ bun init
    - Types: `camelCase.types.ts` (e.g., `game.types.ts`)
 
 2. **Component Structure**
+
    ```tsx
-   import React from 'react'
-   import { cn } from '@/lib/utils'
-   
+   import React from "react";
+   import { cn } from "@/lib/utils";
+
    interface ComponentProps {
      // Props interface
    }
-   
+
    export const Component: React.FC<ComponentProps> = ({ ...props }) => {
      // Component logic
-     
+
      return (
-       <div className={cn('default-classes', props.className)}>
-         {/* JSX */}
-       </div>
-     )
-   }
-   
-   export default Component
+       <div className={cn("default-classes", props.className)}>{/* JSX */}</div>
+     );
+   };
+
+   export default Component;
    ```
 
 3. **State Management**
@@ -215,25 +222,27 @@ bun init
    - Types: `camelCase.types.ts` (e.g., `websocket.types.ts`)
 
 2. **Route Structure**
+
    ```typescript
-   import { Hono } from 'hono'
-   import type { Bindings } from '../types'
-   
-   const app = new Hono<{ Bindings: Bindings }>()
-   
-   app.get('/', async (c) => {
+   import { Hono } from "hono";
+   import type { Bindings } from "../types";
+
+   const app = new Hono<{ Bindings: Bindings }>();
+
+   app.get("/", async (c) => {
      // Route logic
-     return c.json({ data: 'response' })
-   })
-   
-   export default app
+     return c.json({ data: "response" });
+   });
+
+   export default app;
    ```
 
 3. **WebSocket Handlers**
+
    ```typescript
-   import { upgradeWebSocket } from 'hono/bun'
-   import type { WebSocketData } from '../types'
-   
+   import { upgradeWebSocket } from "hono/bun";
+   import type { WebSocketData } from "../types";
+
    export const gameWebSocket = upgradeWebSocket((c) => {
      return {
        onOpen: () => {
@@ -244,9 +253,9 @@ bun init
        },
        onClose: () => {
          // Connection closed
-       }
-     }
-   })
+       },
+     };
+   });
    ```
 
 ### General Rules
@@ -330,21 +339,24 @@ bun init
 ## Scoring System
 
 ### Point Rules
+
 - **Base Points**: 5 points per player per game
 - **Winner Calculation**: +5 × number of losers
 - **Loser Penalty**: -5 points each
 - **Tie Game**: No points exchanged
 
 ### Score Examples
+
 | Players | Winner Gets | Each Loser Loses |
-|---------|-------------|-----------------|
-| 2       | +5          | -5              |
-| 3       | +10         | -5              |
-| 4       | +15         | -5              |
-| 5       | +20         | -5              |
-| 6       | +25         | -5              |
+| ------- | ----------- | ---------------- |
+| 2       | +5          | -5               |
+| 3       | +10         | -5               |
+| 4       | +15         | -5               |
+| 5       | +20         | -5               |
+| 6       | +25         | -5               |
 
 ### Score Tracking
+
 - Total score persisted in database
 - Real-time score updates via WebSocket
 - Score history with game details
@@ -353,6 +365,7 @@ bun init
 - Current win streak
 
 ### UI Components
+
 - **Score Board**: Real-time player scores
 - **Score Notifications**: Animated score changes
 - **Game History**: Detailed score history
@@ -362,6 +375,7 @@ bun init
 ### API Integration
 
 ### Frontend Data Fetching
+
 - **TanStack Query** for server state management
 - Centralized API client with error handling
 - Environment-based API URL configuration
@@ -369,6 +383,7 @@ bun init
 - Type-safe API responses
 
 ### Environment Variables
+
 ```bash
 # Development
 VITE_API_URL=http://localhost:3001/api
@@ -378,6 +393,7 @@ VITE_API_URL=https://your-domain.com/api
 ```
 
 ### Query Organization
+
 - `api/client.ts` - Centralized API client
 - `api/queryKeys.ts` - Query key structure
 - `api/players.ts` - Player-related queries/mutations
@@ -387,6 +403,7 @@ VITE_API_URL=https://your-domain.com/api
 ## State Management
 
 ### Client State with Zustand
+
 - **Player Store**: Authentication and profile data
 - **Room Store**: Room, session, and player list management
 - **Game Store**: Active game state, cards, and turn management
@@ -394,6 +411,7 @@ VITE_API_URL=https://your-domain.com/api
 - TypeScript-first implementation
 
 ### Server State with TanStack Query
+
 - **TanStack Query** for server state management
 - Centralized API client with error handling
 - Environment-based API URL configuration
@@ -401,6 +419,7 @@ VITE_API_URL=https://your-domain.com/api
 - Type-safe API responses
 
 ### Environment Variables
+
 ```bash
 # Development
 VITE_API_URL=http://localhost:3001/api
@@ -410,6 +429,7 @@ VITE_API_URL=https://your-domain.com/api
 ```
 
 ### Query Organization
+
 - `api/client.ts` - Centralized API client
 - `api/queryKeys.ts` - Query key structure
 - `api/players.ts` - Player-related queries/mutations
@@ -423,17 +443,17 @@ VITE_API_URL=https://your-domain.com/api
 interface ClientEvents {
   // Player Management
   player:register: { name: string }
-  
+
   // Room Management
   room:create: { hostName: string; totalRounds: number }
   room:join: { roomCode: string; playerName: string }
   room:leave: { roomId: string }
-  
+
   // Session Control (Host only)
   session:start: { sessionId: string }
   session:nextRound: { sessionId: string }
   session:reset: { sessionId: string; newRounds?: number }
-  
+
   // Game Actions
   game:revealCards: { gameId: string }
 }
@@ -442,30 +462,30 @@ interface ClientEvents {
 interface ServerEvents {
   // Player Events
   player:registered: { player: Player; isNewPlayer: boolean }
-  
+
   // Room Events
   room:created: { room: Room; roomCode: string }
   room:joined: { room: Room; players: Player[] }
   room:playerJoined: { player: Player }
   room:playerLeft: { playerId: string }
-  
+
   // Session Events
   session:started: { session: GameSession }
   session:roundChanged: { roundNumber: number; totalRounds: number }
   session:ended: { finalScores: CumulativeScore[]; winner: Player }
   session:reset: { newSession: GameSession }
-  
+
   // Game Events
   game:cardsDealt: { cards: Card[] }
   game:playerRevealed: { playerId: string; cards: Card[]; score: number }
-  game:ended: { 
-    winner: Player; 
-    scores: Score[]; 
-    scoreChanges: { playerId: string; change: number }[] 
+  game:ended: {
+    winner: Player;
+    scores: Score[];
+    scoreChanges: { playerId: string; change: number }[]
   }
   score:updated: { playerId: string; newScore: number; change: number }
   leaderboard:updated: LeaderboardEntry[]
-  
+
   error: { message: string }
 }
 ```
@@ -473,6 +493,7 @@ interface ServerEvents {
 ## Development Workflow
 
 ### 1. Development Commands
+
 ```bash
 # Install dependencies
 bun install
@@ -492,6 +513,7 @@ bun test
 ```
 
 ### 2. Environment Setup
+
 ```bash
 # .env files
 apps/backend/.env
@@ -504,6 +526,7 @@ NODE_ENV=development
 ```
 
 ### 3. Git Workflow
+
 - Main branch: `main`
 - Feature branches: `feature/feature-name`
 - PR reviews required

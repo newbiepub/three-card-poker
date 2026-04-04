@@ -1,4 +1,4 @@
-import type { Card, HandResult, HandType, Rank } from "../types";
+import type { Card, HandResult, HandType, Rank, Pile } from "../types";
 import {
   CARD_VALUES,
   FACE_CARDS,
@@ -63,6 +63,43 @@ export function generateGameId(): string {
 // Generate random session ID
 export function generateSessionId(): string {
   return "session-" + Math.random().toString(36).substr(2, 9);
+}
+
+// Generate deterministic pile ID
+export function generatePileId(index: number): string {
+  return `pile-${index}`;
+}
+
+// Create EXACTLY `count` piles of 3 cards each from a given deck
+export function createPiles(deck: Card[], count: number): Pile[] {
+  const piles: Pile[] = [];
+  let cardIndex = 0;
+
+  for (let i = 0; i < count; i++) {
+    // Take 3 cards
+    const pileCards = [
+      deck[cardIndex],
+      deck[cardIndex + 1],
+      deck[cardIndex + 2],
+    ].filter(Boolean) as Card[]; // The cast is okay assuming the deck is large enough (e.g. up to 17 players = 51 cards from a 52 card deck).
+
+    if (pileCards.length !== 3) {
+      // Should not happen for 17 or fewer players with a single deck.
+      // Safe fallback.
+      break;
+    }
+
+    piles.push({
+      id: generatePileId(i),
+      cards: pileCards,
+      claimedBy: null,
+      claimedAt: null,
+    });
+
+    cardIndex += 3;
+  }
+
+  return piles;
 }
 
 // ============================================

@@ -1,10 +1,11 @@
 import { Hono } from "hono";
 import { PlayerService } from "../services/playerService";
 import { RoomService } from "../services/roomService";
-import { GameService } from "../services/gameService";
-import { ScoreService } from "../services/scoreService";
 import { SessionService } from "../services/sessionService";
 import { RoomCodeService } from "../services/roomCodeService";
+import { PileService } from "../services/pileService";
+import { AutoPilotService } from "../services/autoPilotService";
+import { PresenceService } from "../services/presenceService";
 
 const app = new Hono();
 
@@ -27,15 +28,21 @@ app.post("/players/register", async (c) => {
   }
 });
 
-// Get player info
-app.get("/players/:playerName", async (c) => {
-  const playerName = c.req.param("playerName");
+// Verify player existence
+app.get("/players/verify/:playerId", async (c) => {
+  const playerId = c.req.param("playerId");
 
-  const player = await PlayerService.getOrCreatePlayer(playerName);
-  const stats = await PlayerService.getPlayerStats(player.id);
-  const rank = await ScoreService.getPlayerRank(player.id);
+  try {
+    const player = await PlayerService.getPlayerById(playerId);
 
-  return c.json({ player, stats, rank });
+    if (!player) {
+      return c.json({ exists: false }, 404);
+    }
+
+    return c.json({ exists: true, player });
+  } catch (error) {
+    return c.json({ error: "Failed to verify player" }, 500);
+  }
 });
 
 // Create room (host)
@@ -100,6 +107,14 @@ app.post("/rooms/join", async (c) => {
       ? await SessionService.getSessionById(room.currentSession.id)
       : null;
 
+    // Reject if session is already playing and player is not already part of it
+    if (session && session.status === "playing") {
+      const presence = await PresenceService.getPresenceMap(room.id);
+      if (!(player.id in presence)) {
+        return c.json({ error: "Cannot join room. Game is currently in progress." }, 403);
+      }
+    }
+
     // TODO: Add player to room (need room_players table)
 
     return c.json({
@@ -130,164 +145,46 @@ app.get("/rooms/:roomCode", async (c) => {
   return c.json({ room, session, stats });
 });
 
-// Session control endpoints
-app.post("/sessions/:sessionId/start", async (c) => {
+// Claim a pile
+app.post("/sessions/:sessionId/claim-pile", async (c) => {
   const sessionId = c.req.param("sessionId");
-  const { hostId } = await c.req.json();
+  const { playerId, pileId, roundNumber } = await c.req.json();
 
   try {
-    // Verify host
-    const isHost = await SessionService.isHost(sessionId, hostId);
-    if (!isHost) {
-      return c.json({ error: "Only host can start session" }, 403);
-    }
-
-    await SessionService.startSession(sessionId);
-
-    // Get session to find room
-    const session = await SessionService.getSessionById(sessionId);
-    if (session && session.roomId) {
-      // Broadcast game started to all players in the room
-      // This is a simple broadcast - in a real app, you'd use the WebSocket server
-    }
-
-    return c.json({ success: true });
-  } catch (error) {
-    return c.json({ error: "Failed to start session" }, 500);
-  }
-});
-
-app.post("/sessions/:sessionId/reset", async (c) => {
-  const sessionId = c.req.param("sessionId");
-  const { hostId, newTotalRounds } = await c.req.json();
-
-  try {
-    // Verify host
-    const isHost = await SessionService.isHost(sessionId, hostId);
-    if (!isHost) {
-      return c.json({ error: "Only host can reset session" }, 403);
-    }
-
-    const newSession = await SessionService.resetSession(
+    const pile = await PileService.claimPile(
       sessionId,
-      newTotalRounds,
+      roundNumber,
+      pileId,
+      playerId,
     );
 
-    return c.json({ session: newSession });
+    // Cancel any scheduled auto plays for this player
+    await AutoPilotService.cancelAutoPlay(sessionId, roundNumber, playerId);
+
+    return c.json({ pile });
   } catch (error) {
-    return c.json({ error: "Failed to reset session" }, 500);
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : "Failed to claim pile",
+      },
+      400,
+    );
   }
 });
 
-// Get session leaderboard
-app.get("/sessions/:sessionId/leaderboard", async (c) => {
+// Snapshot for reconnect
+app.get("/sessions/:sessionId/snapshot/:roomId", async (c) => {
   const sessionId = c.req.param("sessionId");
-
-  const leaderboard = await SessionService.getSessionLeaderboard(sessionId);
-
-  return c.json({ leaderboard });
-});
-
-// Get session history
-app.get("/sessions/:sessionId/history", async (c) => {
-  const sessionId = c.req.param("sessionId");
-
-  const history = await SessionService.getSessionHistory(sessionId);
-
-  return c.json({ history });
-});
-
-// Legacy endpoints
-app.get("/rooms", async (c) => {
-  const rooms = await RoomService.getActiveRooms();
-  return c.json({ rooms });
-});
-
-app.get("/leaderboard", async (c) => {
-  const limit = parseInt(c.req.query("limit") || "10");
-  const leaderboard = await ScoreService.getTopPlayers(limit);
-
-  return c.json({ leaderboard });
-});
-
-app.get("/players/:playerId/history", async (c) => {
-  const playerId = c.req.param("playerId");
-  const limit = parseInt(c.req.query("limit") || "20");
-
-  const history = await ScoreService.getPlayerScoreHistory(playerId, limit);
-
-  return c.json({ history });
-});
-
-app.get("/rooms/:roomId/history", async (c) => {
   const roomId = c.req.param("roomId");
-  const limit = parseInt(c.req.query("limit") || "20");
-
-  const history = await GameService.getRoomGameHistory(roomId, limit);
-
-  return c.json({ history });
-});
-
-// Track ongoing draw-card operations to prevent race conditions
-const drawCardLocks = new Map<string, boolean>();
-
-// Draw a single card for a player (unique across session/round)
-app.post("/sessions/:sessionId/draw-card", async (c) => {
-  const sessionId = c.req.param("sessionId");
-  const { playerId } = await c.req.json();
-  const lockKey = `${sessionId}`;
-
   try {
-    if (drawCardLocks.get(lockKey)) {
-      return c.json({ error: "Draw already in progress" }, 429);
-    }
-
-    drawCardLocks.set(lockKey, true);
-
-    const session = await SessionService.getSessionById(sessionId);
-    if (!session) {
-      drawCardLocks.delete(lockKey);
-      return c.json({ error: "Session not found" }, 404);
-    }
-
-    if (session.status === "finished") {
-      drawCardLocks.delete(lockKey);
-      return c.json({ error: "Session has finished" }, 400);
-    }
-
-    const { card, remaining } = await SessionService.drawCardForRound(
+    const snapshot = await SessionService.getFullStateSnapshot(
       sessionId,
-      session.currentRound,
+      roomId,
     );
-    const { hand, score } = await SessionService.appendPlayerCard(
-      sessionId,
-      playerId,
-      session.currentRound,
-      card,
-    );
-
-    if (score !== null) {
-      await SessionService.savePlayerHand(
-        sessionId,
-        playerId,
-        session.currentRound,
-        hand,
-        score,
-      );
-    }
-
-    drawCardLocks.delete(lockKey);
-    return c.json({
-      card,
-      hand,
-      score,
-      remaining,
-      playerId,
-    });
-  } catch (error) {
-    console.error("Error drawing card:", error);
-    drawCardLocks.delete(lockKey);
-    return c.json({ error: "Failed to draw card" }, 500);
+    if (!snapshot) return c.json({ error: "Session not found" }, 404);
+    return c.json({ snapshot });
+  } catch (e) {
+    return c.json({ error: "Failed to create snapshot" }, 500);
   }
 });
 
@@ -369,17 +266,28 @@ app.post("/sessions/:sessionId/next-round", async (c) => {
     );
 
     if (updatedSession.status !== "finished") {
-      await SessionService.resetDeckForRound(
+      await PileService.generatePiles(
         sessionId,
-        updatedSession.currentRound,
+        nextRound,
+        session.totalRounds, // We set totalRounds to equal playerCount when session started
       );
+
+      // Schedule auto-plays for all players in this round
+      const presence = await PresenceService.getPresenceMap(session.roomId);
+      const playerIds = Object.keys(presence);
+      for (const pid of playerIds) {
+        await AutoPilotService.scheduleAutoPlay(sessionId, nextRound, pid);
+      }
     }
+
+    const allScores = await SessionService.getAllPlayerScores(sessionId);
 
     // Release lock
     nextRoundLocks.delete(sessionId);
 
     return c.json({
       session: updatedSession,
+      allScores,
     });
   } catch (error) {
     console.error("Error updating round:", error);

@@ -141,7 +141,7 @@ export function RoomLobby({
                   <div className="flex justify-between items-center">
                     <span className="font-body">Total Rounds:</span>
                     <span className="font-body font-bold">
-                      {session.totalRounds}
+                      {session.status === "waiting" ? players.length : session.totalRounds}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">

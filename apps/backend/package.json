@@ -15,10 +15,13 @@
     "db:studio": "bunx drizzle-kit studio"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/bun": "latest",
     "@types/node": "^22.9.0",
     "drizzle-kit": "^0.31.8",
-    "typescript": "^5"
+    "eslint": "^10.2.0",
+    "typescript": "^5",
+    "typescript-eslint": "^8.58.0"
   },
   "peerDependencies": {
     "typescript": "^5"

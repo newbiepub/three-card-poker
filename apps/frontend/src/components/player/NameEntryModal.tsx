@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
+import React, { useState } from "react";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '../ui/dialog';
+} from "../ui/dialog";
 
 interface NameEntryModalProps {
   isOpen: boolean;
@@ -17,77 +17,79 @@ interface NameEntryModalProps {
   isLoading?: boolean;
 }
 
-export function NameEntryModal({ isOpen, onSubmit, isLoading }: NameEntryModalProps) {
-  const [name, setName] = useState('');
-  const [error, setError] = useState('');
+export function NameEntryModal({
+  isOpen,
+  onSubmit,
+  isLoading,
+}: NameEntryModalProps) {
+  const [name, setName] = useState("");
+  const [error, setError] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!name.trim()) {
-      setError('Please enter your name');
+      setError("Please enter your name");
       return;
     }
-    
+
     if (name.trim().length < 2) {
-      setError('Name must be at least 2 characters');
+      setError("Name must be at least 2 characters");
       return;
     }
-    
+
     if (name.trim().length > 20) {
-      setError('Name must be less than 20 characters');
+      setError("Name must be less than 20 characters");
       return;
     }
-    
-    setError('');
+
+    setError("");
     onSubmit(name.trim());
   };
 
   return (
     <Dialog open={isOpen}>
-      <DialogContent className="sm:max-w-[425px] crt-scanlines">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle className="font-heading text-2xl neon-text">
-            Welcome to Three Card Poker
+          <DialogTitle className="font-heading text-2xl">
+            Pick a Name
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Enter your name to get started with the game
+            Choose a display name to play with
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right font-body">
-                Name
+            <div className="space-y-2">
+              <Label htmlFor="name" className="font-body">
+                Display Name
               </Label>
-              <div className="col-span-3">
-                <Input
-                  id="name"
-                  value={name}
-                  onChange={(e) => {
-                    setName(e.target.value);
-                    setError('');
-                  }}
-                  className="col-span-3 font-body"
-                  placeholder="Enter your name"
-                  maxLength={20}
-                  disabled={isLoading}
-                />
-                {error && (
-                  <p className="text-sm text-destructive mt-1 font-body">
-                    {error}
-                  </p>
-                )}
-              </div>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setError("");
+                }}
+                className="font-body"
+                placeholder="Enter your name"
+                maxLength={20}
+                disabled={isLoading}
+              />
+              {error && (
+                <p className="text-sm text-destructive mt-1 font-body">
+                  {error}
+                </p>
+              )}
             </div>
           </div>
           <DialogFooter>
-            <Button 
-              type="submit" 
-              className="font-body font-semibold"
+            <Button
+              type="submit"
+              className="w-full bg-[var(--color-accent)] text-white hover:opacity-90 font-body font-semibold transition-all"
               disabled={isLoading}
             >
-              {isLoading ? 'Joining...' : 'Join Game'}
+              {isLoading ? "Starting..." : "Continue"}
             </Button>
           </DialogFooter>
         </form>

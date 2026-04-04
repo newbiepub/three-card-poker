@@ -56,12 +56,8 @@
           "name": "game_history_game_id_games_id_fk",
           "tableFrom": "game_history",
           "tableTo": "games",
-          "columnsFrom": [
-            "game_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["game_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -69,12 +65,8 @@
           "name": "game_history_player_id_players_id_fk",
           "tableFrom": "game_history",
           "tableTo": "players",
-          "columnsFrom": [
-            "player_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["player_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -151,12 +143,8 @@
           "name": "game_players_game_id_games_id_fk",
           "tableFrom": "game_players",
           "tableTo": "games",
-          "columnsFrom": [
-            "game_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["game_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -164,12 +152,8 @@
           "name": "game_players_player_id_players_id_fk",
           "tableFrom": "game_players",
           "tableTo": "players",
-          "columnsFrom": [
-            "player_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["player_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -254,12 +238,8 @@
           "name": "games_room_id_rooms_id_fk",
           "tableFrom": "games",
           "tableTo": "rooms",
-          "columnsFrom": [
-            "room_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["room_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -418,9 +398,7 @@
       "indexes": {
         "rooms_room_code_unique": {
           "name": "rooms_room_code_unique",
-          "columns": [
-            "room_code"
-          ],
+          "columns": ["room_code"],
           "isUnique": true
         }
       },
@@ -502,12 +480,8 @@
           "name": "session_scores_session_id_sessions_id_fk",
           "tableFrom": "session_scores",
           "tableTo": "sessions",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -515,12 +489,8 @@
           "name": "session_scores_player_id_players_id_fk",
           "tableFrom": "session_scores",
           "tableTo": "players",
-          "columnsFrom": [
-            "player_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["player_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -597,12 +567,8 @@
           "name": "sessions_room_id_rooms_id_fk",
           "tableFrom": "sessions",
           "tableTo": "rooms",
-          "columnsFrom": [
-            "room_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["room_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -610,12 +576,8 @@
           "name": "sessions_host_id_players_id_fk",
           "tableFrom": "sessions",
           "tableTo": "players",
-          "columnsFrom": [
-            "host_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["host_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }

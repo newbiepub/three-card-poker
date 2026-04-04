@@ -9,7 +9,7 @@ COPY packages ./packages
 RUN bun install --frozen-lockfile
 
 FROM base AS build-frontend
-ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_API_URL=https://baicao.nport.link/api
 RUN bun run --cwd apps/frontend build
 
 FROM base AS build-backend

@@ -65,11 +65,14 @@ export const FACE_CARDS: Rank[] = ["J", "Q", "K"];
 
 // Game configuration
 export const GAME_CONFIG = {
-  MAX_PLAYERS: 12,
+  MAX_PLAYERS: 17,
   MIN_PLAYERS: 2,
   CARDS_PER_PLAYER: 3,
   DECK_SIZE: 52,
   MAX_SCORE: 9,
+  PILE_CLAIM_TIMEOUT_MS: 15_000,
+  RECONNECT_GRACE_PERIOD_MS: 60_000,
+  AUTO_PLAY_POLL_INTERVAL_MS: 3_000,
 };
 
 // Room settings
@@ -88,6 +91,9 @@ export const WS_MESSAGE_TYPES = {
   REVEAL_CARDS: "revealCards",
   PLACE_BET: "placeBet",
   PLAYER_READY: "playerReady",
+  CLAIM_PILE: "claimPile",
+  SEND_STICKER: "sendSticker",
+  HEARTBEAT: "heartbeat",
 
   // Server to Client
   CONNECTED: "connected",
@@ -100,6 +106,15 @@ export const WS_MESSAGE_TYPES = {
   ERROR: "error",
   PLAYER_JOINED: "playerJoined",
   PLAYER_LEFT: "playerLeft",
+  PILES_REVEALED: "pilesRevealed",
+  PILE_CLAIMED: "pileClaimed",
+  PILE_REJECTED: "pileRejected",
+  HAND_REVEALED: "handRevealed",
+  SCORE_PUBLISHED: "scorePublished",
+  STICKER_SENT: "stickerSent",
+  PRESENCE_UPDATE: "presenceUpdate",
+  AUTO_PLAYED: "autoPlayed",
+  RECONNECT_STATE: "reconnectState",
 } as const;
 
 // Game phases

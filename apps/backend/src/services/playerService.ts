@@ -16,7 +16,7 @@ export class PlayerService {
     };
 
     const [player] = await db.insert(players).values(newPlayer).returning();
-    if (!player) throw new Error('Player not created');
+    if (!player) throw new Error("Player not created");
     return player;
   }
 
@@ -45,7 +45,7 @@ export class PlayerService {
   static async updatePlayerStats(
     playerId: string,
     isWinner: boolean,
-    scoreChange: number
+    scoreChange: number,
   ): Promise<void> {
     const updates = {
       totalGames: sql`${players.totalGames} + 1`,
@@ -65,10 +65,7 @@ export class PlayerService {
       });
     }
 
-    await db
-      .update(players)
-      .set(updates)
-      .where(eq(players.id, playerId));
+    await db.update(players).set(updates).where(eq(players.id, playerId));
   }
 
   // Get leaderboard (top players by score)

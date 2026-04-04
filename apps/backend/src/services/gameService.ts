@@ -1,15 +1,19 @@
 import { eq, and, sql, desc } from "drizzle-orm";
-import { 
-  db, 
-  games, 
-  gamePlayers, 
+import {
+  db,
+  games,
+  gamePlayers,
   gameHistory,
-  type Game, 
+  type Game,
   type NewGame,
   type NewGamePlayer,
-  type NewGameHistory
+  type NewGameHistory,
 } from "../db";
-import { generateGameId, generateRoomId, type Card } from "@three-card-poker/shared";
+import {
+  generateGameId,
+  generateRoomId,
+  type Card,
+} from "@three-card-poker/shared";
 
 export class GameService {
   // Create a new game
@@ -24,9 +28,9 @@ export class GameService {
     };
 
     const [game] = await db.insert(games).values(newGame).returning();
-    
-    if (!game) throw new Error('Game not created');
-    
+
+    if (!game) throw new Error("Game not created");
+
     // Update room with current session
     await db
       .update(rooms)
@@ -39,17 +43,19 @@ export class GameService {
   // Add players to a game
   static async addPlayersToGame(
     gameId: string,
-    playersWithCards: Array<{ playerId: string; cards: Card[]; score: number }>
+    playersWithCards: Array<{ playerId: string; cards: Card[]; score: number }>,
   ): Promise<void> {
-    const gamePlayerEntries: NewGamePlayer[] = playersWithCards.map((p, index) => ({
-      id: `${gameId}-player-${index}`,
-      gameId,
-      playerId: p.playerId,
-      cards: JSON.stringify(p.cards),
-      score: p.score,
-      isWinner: false,
-      scoreChange: 0,
-    }));
+    const gamePlayerEntries: NewGamePlayer[] = playersWithCards.map(
+      (p, index) => ({
+        id: `${gameId}-player-${index}`,
+        gameId,
+        playerId: p.playerId,
+        cards: JSON.stringify(p.cards),
+        score: p.score,
+        isWinner: false,
+        scoreChange: 0,
+      }),
+    );
 
     await db.insert(gamePlayers).values(gamePlayerEntries);
 
@@ -69,10 +75,12 @@ export class GameService {
   static async finishGame(
     gameId: string,
     winnerId: string,
-    finalScores: Array<{ playerId: string; score: number }>
+    finalScores: Array<{ playerId: string; score: number }>,
   ): Promise<void> {
     // Calculate score changes
-    const loserCount = finalScores.filter(s => s.playerId !== winnerId).length;
+    const loserCount = finalScores.filter(
+      (s) => s.playerId !== winnerId,
+    ).length;
     const winnerPoints = loserCount * 5;
     const loserPoints = -5;
 
@@ -100,15 +108,15 @@ export class GameService {
         .where(
           and(
             eq(gamePlayers.gameId, gameId),
-            eq(gamePlayers.playerId, scoreData.playerId)
-          )
+            eq(gamePlayers.playerId, scoreData.playerId),
+          ),
         );
 
       // Update player stats
       await PlayerService.updatePlayerStats(
         scoreData.playerId,
         isWinner,
-        scoreChange
+        scoreChange,
       );
 
       // Record history
@@ -117,10 +125,11 @@ export class GameService {
         gameId,
         playerId: scoreData.playerId,
         action: isWinner ? "won" : "lost",
-        data: JSON.stringify({ 
-          score: scoreData.score, 
+        data: JSON.stringify({
+          score: scoreData.score,
           scoreChange,
-          finalPosition: finalScores.findIndex(s => s.playerId === scoreData.playerId) + 1 
+          finalPosition:
+            finalScores.findIndex((s) => s.playerId === scoreData.playerId) + 1,
         }),
       });
     }
@@ -130,10 +139,10 @@ export class GameService {
     if (game) {
       await db
         .update(rooms)
-        .set({ 
+        .set({
           currentSessionId: null,
           status: "waiting",
-          finishedAt: new Date()
+          finishedAt: new Date(),
         })
         .where(eq(rooms.id, game.roomId));
     }

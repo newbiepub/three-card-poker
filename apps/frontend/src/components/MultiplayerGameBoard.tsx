@@ -1,105 +1,69 @@
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Trophy, Sparkles } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { RoundResultModal } from "@/components/RoundResultModal";
+import { PileGrid } from "./PileGrid";
+import { SwipeCardArea } from "./SwipeCardArea";
+import { PlayerRoster } from "./PlayerRoster";
+import { StickerPicker } from "./StickerPicker";
+import { StickerOverlay } from "./StickerOverlay";
+
 import {
-  useDrawCard,
   usePublishScore,
   useSessionState,
   useUpdateSessionRound,
 } from "@/api/sessions";
-import { RoundResultModal } from "@/components/RoundResultModal";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import {
   useGameStore,
   usePlayerStore,
   useRoomStore,
   useWebSocketStore,
 } from "@/store";
+import { evaluateHand, determineWinner } from "@three-card-poker/shared";
 import type { Card as CardType } from "@three-card-poker/shared";
-import { determineWinner, evaluateHand } from "@three-card-poker/shared";
-import { Eye, EyeOff, Trophy, Users, X } from "lucide-react";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import type { GamePlayer } from "@/store";
 
 export const MultiplayerGameBoard: React.FC = () => {
   const { player } = usePlayerStore();
-  const { session, isHost, room } = useRoomStore();
+  const { session } = useRoomStore();
   const { send } = useWebSocketStore();
+
   const {
     currentRound,
     totalRounds,
     gameStatus,
     players,
     roundWinner,
-    gameWinner,
     showRoundResult,
     showFinalResult,
-    updatePlayerHand,
     publishPlayerScore,
-    syncPlayerScores,
-    syncPlayerCumulativeScores,
     setGameState,
     setRoundWinner,
-    setCurrentRound,
     setShowRoundResult,
+    piles,
+    claimPile,
+    setCurrentRound,
+    syncPlayerScores,
+    syncPlayerCumulativeScores,
   } = useGameStore();
 
-  const [playerHand, setPlayerHand] = useState<Array<CardType | null>>([
-    null,
-    null,
-    null,
-  ]);
-  const [playerScore, setPlayerScore] = useState<number | null>(null);
-  const [hasDealt, setHasDealt] = useState(false);
-  const [showScore, setShowScore] = useState(false);
-  const [isUpdatingRound, setIsUpdatingRound] = useState(false);
-  const hasRestoredScores = useRef(false);
-  const previousRoundRef = useRef<number | null>(null);
-  const previousGameStatusRef = useRef(gameStatus);
-  const syncPlayerScoresRef = useRef(syncPlayerScores);
-  const playersRef = useRef(players);
-  syncPlayerScoresRef.current = syncPlayerScores;
-  playersRef.current = players;
-  previousGameStatusRef.current = gameStatus;
-
-  const drawCardMutation = useDrawCard();
   const publishScoreMutation = usePublishScore();
   const updateRoundMutation = useUpdateSessionRound();
+
+  const [isUpdatingRound, setIsUpdatingRound] = useState(false);
+  const previousRoundRef = useRef<number | null>(null);
 
   const { data: sessionState, refetch: refetchSessionState } = useSessionState(
     session?.id,
     !!session?.id,
   );
 
-  const allPlayersPublished = useMemo(() => {
-    if (players.length === 0) {
-      return false;
-    }
-
-    const localAllPublished = players.every((playerItem) =>
-      Boolean(playerItem.hasPublishedScore),
-    );
-
-    if (localAllPublished) {
-      return true;
-    }
-
-    if (!sessionState) {
-      return false;
-    }
-
-    const publishedPlayerIds = new Set(
-      sessionState.scores.map((score) => score.playerId),
-    );
-
-    return (
-      publishedPlayerIds.size > 0 &&
-      players.every((playerItem) => publishedPlayerIds.has(playerItem.id))
-    );
-  }, [sessionState, players]);
-
+  // Sync session state on reconnect/update
   useEffect(() => {
-    if (sessionState && player && !hasRestoredScores.current) {
-      // Sync round number from session state
+    if (sessionState && players.length > 0) {
       if (
         sessionState.currentRound &&
         sessionState.currentRound > currentRound
@@ -107,25 +71,7 @@ export const MultiplayerGameBoard: React.FC = () => {
         setCurrentRound(sessionState.currentRound);
       }
 
-      const playerScore = sessionState.scores.find(
-        (s) => s.playerId === player.id,
-      );
-      if (playerScore && playerScore.cards) {
-        setPlayerHand(playerScore.cards as CardType[]);
-        setPlayerScore(playerScore.gameScore);
-        setHasDealt(true);
-        setShowScore(false); // Don't show score yet, allow player to publish again
-        updatePlayerHand(player.id, playerScore.cards);
-        // Don't call publishPlayerScore here - it would duplicate the score in totalScore
-        // The score is already saved in the database, just restore the UI state
-      }
-      hasRestoredScores.current = true;
-    }
-  }, [sessionState, player, updatePlayerHand, currentRound, setCurrentRound]);
-
-  useEffect(() => {
-    if (sessionState && playersRef.current.length > 0) {
-      syncPlayerScoresRef.current(
+      syncPlayerScores(
         sessionState.scores.map((score) => ({
           playerId: score.playerId,
           gameScore: score.gameScore,
@@ -142,7 +88,20 @@ export const MultiplayerGameBoard: React.FC = () => {
         })),
       );
     }
-  }, [sessionState, players.length, syncPlayerCumulativeScores]);
+  }, [
+    sessionState,
+    players.length,
+    currentRound,
+    setCurrentRound,
+    syncPlayerScores,
+    syncPlayerCumulativeScores,
+  ]);
+
+  // Handle all published Check
+  const allPlayersPublished = useMemo(() => {
+    if (players.length === 0) return false;
+    return players.every((p) => p.hasPublishedScore);
+  }, [players]);
 
   useEffect(() => {
     if (allPlayersPublished && gameStatus === "playing") {
@@ -157,12 +116,10 @@ export const MultiplayerGameBoard: React.FC = () => {
       !showRoundResult &&
       players.length > 0
     ) {
-      // Find winner based on pointsChange from backend
       const winnerByPoints = players.find((p) => (p.roundScore || 0) > 0);
       if (winnerByPoints) {
         setRoundWinner(winnerByPoints);
       } else {
-        // Fallback: Perform proper hand evaluation on frontend to show correct winner immediately
         const playersWithHands = players.filter(
           (p) => p.hand && p.hand.length === 3,
         );
@@ -174,7 +131,6 @@ export const MultiplayerGameBoard: React.FC = () => {
             playersWithHands[winnerIndex] || playersWithHands[0];
           setRoundWinner(fallbackWinner);
         } else {
-          // Absolute fallback
           const fallbackWinner = players.reduce((prev, current) =>
             (prev.score || 0) > (current.score || 0) ? prev : current,
           );
@@ -188,248 +144,133 @@ export const MultiplayerGameBoard: React.FC = () => {
     showRoundResult,
     players,
     setRoundWinner,
-    setShowRoundResult,
   ]);
-
-  useEffect(() => {
-    const previousStatus = previousGameStatusRef.current;
-    if (previousStatus === "round-end" && gameStatus === "playing") {
-      setShowRoundResult(false);
-      setHasDealt(false);
-      setPlayerHand([null, null, null]);
-      setPlayerScore(null);
-      setShowScore(false);
-    }
-    previousGameStatusRef.current = gameStatus;
-  }, [gameStatus, setShowRoundResult]);
 
   useEffect(() => {
     if (previousRoundRef.current === null) {
       previousRoundRef.current = currentRound;
       return;
     }
-
     if (currentRound !== previousRoundRef.current) {
       previousRoundRef.current = currentRound;
-      hasRestoredScores.current = false;
-      setHasDealt(false);
-      setPlayerHand([null, null, null]);
-      setPlayerScore(null);
-      setShowScore(false);
       setIsUpdatingRound(false);
       refetchSessionState();
     }
   }, [currentRound, refetchSessionState]);
 
-  const handleDrawCard = async (index: number) => {
-    if (!player || !session) {
-      return;
-    }
+  // Game Logic Actions
+  const handleClaimPile = async (pileId: string) => {
+    if (!player || !session) return;
+    try {
+      claimPile(pileId, player.id);
 
-    if (playerHand[index] || drawCardMutation.isPending) {
-      return;
+      send({
+        type: "claimPile",
+        pileId,
+        sessionId: session.id,
+        roundNumber: currentRound,
+      });
+      // the websocket handles the real state, or we could await claimPileMutation
+      // Let's use pure websocket driven for smooth ux, but call the rest occasionally if needed
+      // Actually since Phase 4 I set up `POST /sessions/:id/claim-pile`, lets rely on WS fallback
+    } catch {
+      alert("Failed to claim pile");
     }
+  };
+
+  const handlePublishScore = async () => {
+    if (!player || !session) return;
+
+    // Evaluate cards manually to publish
+    const myPile = piles.find((p) => p.claimedBy === player.id);
+    const myHand =
+      myPile?.cards && myPile.cards.length === 3 ? myPile.cards : playerHand;
+    if (!myHand || myHand.length !== 3) return;
 
     try {
-      const result = await drawCardMutation.mutateAsync({
+      const evaluation = evaluateHand(myHand as [CardType, CardType, CardType]);
+      const calculatedScore = evaluation.score;
+
+      await publishScoreMutation.mutateAsync({
         sessionId: session.id,
         playerId: player.id,
+        score: calculatedScore,
+        roundNumber: currentRound,
       });
 
-      if (!result || !result.card) {
-        throw new Error(
-          "Invalid response from server: " + JSON.stringify(result),
-        );
-      }
-
-      const updatedHand = [...playerHand];
-      updatedHand[index] = result.card;
-
-      setPlayerHand(updatedHand);
-      setPlayerScore(result.score ?? null);
-
-      // Sync partial hand to store immediately so it survives refetches
-      updatePlayerHand(
+      publishPlayerScore(
         player.id,
-        updatedHand.filter((c): c is CardType => c !== null),
+        calculatedScore,
+        undefined,
+        undefined,
+        myHand,
       );
 
-      const allDrawn = updatedHand.every(Boolean);
-      setHasDealt(allDrawn);
-      setShowScore(false); // Don't show score yet, show Publish button instead
-    } catch {
-      alert("Failed to draw a card. Please try again.");
+      send({
+        type: "playerScore",
+        playerId: player.id,
+        score: calculatedScore,
+        cards: myHand,
+      });
+    } catch (e) {
+      console.error(e);
+      alert("Failed to publish score");
     }
-  };
-
-  const publishScore = async () => {
-    if (playerScore !== null && player && session) {
-      try {
-        await publishScoreMutation.mutateAsync({
-          sessionId: session.id,
-          playerId: player.id,
-          score: playerScore,
-          roundNumber: currentRound,
-        });
-
-        const cleanHand = playerHand.filter((c): c is CardType => c !== null);
-        publishPlayerScore(
-          player.id,
-          playerScore,
-          undefined,
-          undefined,
-          cleanHand,
-        );
-        setShowScore(true);
-
-        send({
-          type: "playerScore",
-          playerId: player.id,
-          score: playerScore,
-          cards: cleanHand,
-        });
-      } catch (error) {
-        console.error("Failed to publish score:", error);
-      }
-    }
-  };
-
-  const getCardColor = (suit: string) => {
-    return suit === "♥" || suit === "♦" ? "text-red-500" : "text-gray-900";
-  };
-
-  const getCurrentPlayer = () => {
-    return players.find((p) => p.id === player?.id);
   };
 
   const handleNextRound = async () => {
     if (!session || isUpdatingRound) return;
-
     try {
       setIsUpdatingRound(true);
       setShowRoundResult(false);
-      setHasDealt(false);
-      setPlayerHand([null, null, null]);
-      setPlayerScore(null);
-      setShowScore(false);
 
       const response = (await updateRoundMutation.mutateAsync({
         sessionId: session.id,
         expectedCurrentRound: currentRound,
-      })) as { session?: { currentRound?: number } } | undefined;
+      })) as { session?: { currentRound?: number }; allScores?: Array<Record<string, unknown>> } | undefined;
+
       const nextRoundNumber =
         response?.session?.currentRound ?? currentRound + 1;
+
+      if (response?.allScores) {
+        syncPlayerCumulativeScores(response.allScores.map((score: Record<string, unknown>) => ({
+          playerId: score.playerId as string,
+          cumulatedScore: score.cumulativeScore as number,
+        })));
+      }
 
       send({
         type: "nextRound",
         round: nextRoundNumber,
+        allScores: response?.allScores,
       });
     } catch (error: unknown) {
-      // Handle race condition error
-      if (
-        error &&
+      const status =
         typeof error === "object" &&
+        error !== null &&
         "response" in error &&
-        typeof error.response === "object" &&
-        error.response &&
-        "status" in error.response &&
-        error.response.status === 429
-      ) {
-        // Another player is already processing next round
-        // Just wait and let the WebSocket update handle it
+        typeof (error as { response?: { status?: unknown } }).response
+          ?.status === "number"
+          ? (error as { response: { status: number } }).response.status
+          : undefined;
+
+      if (status === 429) {
+        // Race condition safe ignored
       } else {
-        // Reset lock on other errors so user can try again
         setIsUpdatingRound(false);
       }
     }
   };
 
-  const handleViewRoundResult = () => {
-    // Find winner based on pointsChange from backend
-    const winnerByPoints = players.find((p) => (p.roundScore || 0) > 0);
-    if (winnerByPoints) {
-      setRoundWinner(winnerByPoints);
-    } else {
-      // Fallback: Perform proper hand evaluation
-      const playersWithHands = players.filter(
-        (p) => p.hand && p.hand.length === 3,
-      );
-      if (playersWithHands.length > 0) {
-        const handResults = playersWithHands.map((p) => evaluateHand(p.hand));
-        const winnerIndex = determineWinner(handResults);
-
-        const fallbackWinner =
-          playersWithHands[winnerIndex] || playersWithHands[0];
-        setRoundWinner(fallbackWinner);
-      } else {
-        const fallbackWinner = players.reduce((prev, current) =>
-          (prev.score || 0) > (current.score || 0) ? prev : current,
-        );
-        setRoundWinner(fallbackWinner);
-      }
-    }
-    setShowRoundResult(true);
+  const handleKickPlayer = (playerId: string) => {
+    send({
+      type: "kickPlayer",
+      targetPlayerId: playerId,
+    });
   };
 
-  if (showFinalResult && gameWinner) {
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-2xl"
-        >
-          <Card className="p-8 shadow-lg">
-            <div className="text-center">
-              <motion.div
-                initial={{ rotate: -10, scale: 0.8 }}
-                animate={{ rotate: 0, scale: 1 }}
-                transition={{ type: "spring", stiffness: 200 }}
-              >
-                <Trophy className="w-16 h-16 mx-auto mb-4 text-yellow-500" />
-              </motion.div>
-              <h2 className="text-3xl font-bold font-heading mb-6">
-                Game Over!
-              </h2>
-
-              <div className="space-y-2 mb-8">
-                <h3 className="text-lg font-semibold mb-4">Final Scores</h3>
-                <div className="space-y-2">
-                  {players
-                    .sort((a, b) => b.cumulatedScore - a.cumulatedScore)
-                    .map((p, index) => (
-                      <motion.div
-                        key={p.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        className="flex items-center justify-between p-3 rounded-lg bg-secondary"
-                      >
-                        <div className="flex items-center gap-3">
-                          {index === 0 && (
-                            <Trophy className="w-5 h-5 text-yellow-500" />
-                          )}
-                          <span className="font-medium">{p.name}</span>
-                        </div>
-                        <Badge variant="outline" className="font-mono">
-                          {p.cumulatedScore} pts
-                        </Badge>
-                      </motion.div>
-                    ))}
-                </div>
-              </div>
-
-              <Button
-                onClick={() => (window.location.href = "/")}
-                className="font-body"
-              >
-                Back to Home
-              </Button>
-            </div>
-          </Card>
-        </motion.div>
-      </div>
-    );
+  if (showFinalResult) {
+    return <GameEndOverlay players={players} />;
   }
 
   if (showRoundResult && roundWinner) {
@@ -444,263 +285,205 @@ export const MultiplayerGameBoard: React.FC = () => {
     );
   }
 
-  const currentPlayer = getCurrentPlayer();
+  const currentPlayer = players.find((p) => p.id === player?.id);
+  const myPile:
+    | {
+        id: string;
+        cards: CardType[];
+        claimedBy: string | null;
+        claimedAt: number | null;
+      }
+    | undefined = piles.find((p) => p.claimedBy === player?.id);
+  const playerHand = myPile?.cards || currentPlayer?.hand || [];
+  const showSwipeArea = !!myPile;
 
   return (
-    <div className="space-y-6">
-      {/* Game Header */}
-      <Card className="p-4 shadow-lg border-primary/20">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-xl font-bold font-heading">
-              Round {currentRound} of {totalRounds}
-            </h2>
-            <Badge variant={gameStatus === "playing" ? "default" : "secondary"}>
-              {gameStatus}
-            </Badge>
-          </div>
-          <div className="flex items-center gap-2">
-            <Users className="w-4 h-4" />
-            <span>{players.length} Players</span>
-          </div>
-        </div>
-      </Card>
+    <div className="flex flex-col md:flex-row gap-6 relative min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 md:p-6">
+      <StickerOverlay />
 
-      {/* Scoreboard */}
-      <Card className="p-4 shadow-lg">
-        <h3 className="font-semibold mb-3 font-heading">Scoreboard</h3>
-        <div
-          className={`space-y-2 ${players.length > 6 ? "grid grid-cols-1 md:grid-cols-2 gap-3 space-y-0" : "space-y-2"}`}
-        >
-          <AnimatePresence mode="popLayout">
-            {players
-              .sort((a, b) => b.totalScore - a.totalScore)
-              .map((p) => (
-                <motion.div
-                  key={p.id}
-                  layout
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
-                    p.id === player?.id
-                      ? "border-primary bg-primary/5 shadow-sm"
-                      : "border-border"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{p.name}</span>
-                        {p.id === player?.id && (
-                          <span className="text-xs text-muted-foreground">
-                            (You)
-                          </span>
-                        )}
-                        {isHost &&
-                          p.id !== player?.id &&
-                          p.id !== room?.hostId && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                send({
-                                  type: "kickPlayer",
-                                  targetPlayerId: p.id,
-                                });
-                              }}
-                              className="p-1 rounded hover:bg-red-100 hover:text-red-500 transition-colors"
-                              title="Kick player"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          )}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Total: {p.totalScore} pts
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {p.hasPublishedScore ? (
-                      <>
-                        <div className="flex gap-1 mr-2">
-                          {(p.hand || []).map((card, idx) => (
-                            <motion.div
-                              key={idx}
-                              initial={{ opacity: 0, scale: 0.5 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              transition={{ delay: idx * 0.1 }}
-                              className="w-6 h-9 rounded border border-border bg-white flex flex-col items-center justify-center shadow-sm"
-                            >
-                              <span
-                                className={
-                                  card.suit === "♥" || card.suit === "♦"
-                                    ? "text-red-500 font-bold text-xs"
-                                    : "text-gray-900 font-bold text-xs"
-                                }
-                              >
-                                {card.rank}
-                              </span>
-                              <span
-                                className={
-                                  card.suit === "♥" || card.suit === "♦"
-                                    ? "text-red-500"
-                                    : "text-gray-900"
-                                }
-                                style={{ fontSize: "6px" }}
-                              >
-                                {card.suit}
-                              </span>
-                            </motion.div>
-                          ))}
-                        </div>
-                        <Badge variant="secondary">{p.score ?? 0}</Badge>
-                        <Eye className="w-4 h-4 text-green-500" />
-                      </>
-                    ) : (
-                      <EyeOff className="w-4 h-4 text-muted-foreground" />
-                    )}
-                  </div>
-                </motion.div>
-              ))}
-          </AnimatePresence>
-        </div>
-      </Card>
-
-      {/* Player's Hand */}
-      <Card className="p-6 shadow-lg border-primary/10">
-        <h3 className="font-semibold mb-4 font-heading">Your Hand</h3>
-
-        <div className="space-y-4">
-          <div className="flex justify-center gap-4">
-            {playerHand.map((card, index) => (
-              <motion.button
-                key={index}
-                whileHover={!card ? { scale: 1.05 } : {}}
-                whileTap={!card ? { scale: 0.95 } : {}}
-                onClick={() => handleDrawCard(index)}
-                disabled={!!card || drawCardMutation.isPending}
-                className={`group relative w-20 h-28 rounded-xl border-2 shadow-lg transition-all duration-300 flex flex-col items-center justify-center overflow-hidden ${
-                  card
-                    ? "bg-white border-border"
-                    : "bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 border-slate-700 hover:border-primary/50"
-                }`}
+      {/* Main Game Area */}
+      <div className="flex-1 space-y-6">
+        <Card className="p-6 glass-dark rounded-2xl relative">
+          {/* Animated gradient accent */}
+          <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary/5 via-transparent to-accent/5 animate-pulse opacity-50 pointer-events-none" />
+          <div className="relative z-10 flex justify-between items-center">
+            <div>
+              <h2 className="text-xl font-bold font-heading text-white mb-1">
+                Round{" "}
+                <span className="text-primary drop-shadow-[0_0_8px_rgba(13,148,136,0.8)]">{currentRound}</span>
+                <span className="text-slate-400 text-sm ml-2">/ {totalRounds}</span>
+              </h2>
+              <Badge
+                variant={gameStatus === "playing" ? "default" : "secondary"}
+                className={gameStatus === "playing" ? "neon-border-glow neon-pulse" : ""}
               >
-                <AnimatePresence mode="wait">
-                  {card ? (
-                    <motion.div
-                      key="front"
-                      initial={{ rotateY: 180, opacity: 0 }}
-                      animate={{ rotateY: 0, opacity: 1 }}
-                      transition={{
-                        type: "spring",
-                        stiffness: 260,
-                        damping: 20,
-                      }}
-                      className="flex flex-col items-center justify-center"
-                    >
-                      <span
-                        className={`text-3xl font-bold ${getCardColor(card.suit)}`}
-                      >
-                        {card.rank}
-                      </span>
-                      <span className={`text-2xl ${getCardColor(card.suit)}`}>
-                        {card.suit}
-                      </span>
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="back"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="flex flex-col items-center justify-center"
-                    >
-                      <div className="w-12 h-16 rounded border-2 border-slate-700 bg-slate-800/50 flex flex-col items-center justify-center opacity-40 group-hover:opacity-100 transition-opacity">
-                        <div className="w-6 h-6 rounded-full border border-slate-600 bg-slate-700/50" />
-                      </div>
-                      <span className="mt-2 text-[10px] font-bold text-slate-400 font-heading uppercase tracking-widest">
-                        Draw
-                      </span>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* Subtle highlight effect */}
-                {!card && (
-                  <div className="absolute inset-0 bg-linear-to-tr from-primary/0 via-primary/5 to-primary/0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                )}
-              </motion.button>
-            ))}
+                {gameStatus}
+              </Badge>
+            </div>
+            {showSwipeArea && currentPlayer?.hasPublishedScore && (
+              <StickerPicker />
+            )}
           </div>
+        </Card>
 
-          <p className="text-center text-sm text-muted-foreground font-body">
-            {hasDealt ? "Hand complete" : "Click each card to draw your hand"}
-          </p>
+        {showSwipeArea ? (
+          <Card className="p-6 glass-dark min-h-[400px] flex items-center justify-center rounded-3xl border-primary/20">
+            <SwipeCardArea
+              cards={playerHand}
+              hasPublished={!!currentPlayer?.hasPublishedScore}
+              score={currentPlayer?.score ?? null}
+              isPublishing={publishScoreMutation.isPending}
+              onPublishScore={handlePublishScore}
+            />
+          </Card>
+        ) : (
+          <Card className="p-8 glass-dark min-h-[400px] flex flex-col items-center justify-center rounded-3xl border-primary/20">
+            <PileGrid
+              piles={piles}
+              onClaimPile={handleClaimPile}
+              isClaiming={false}
+              selectedPileId={myPile?.id || null}
+            />
+          </Card>
+        )}
 
-          {hasDealt && (
+        <AnimatePresence>
+          {allPlayersPublished && !showRoundResult && (
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-center"
+              exit={{ opacity: 0 }}
             >
-              {showScore ? (
-                <div className="space-y-3">
-                  <Badge
-                    variant="secondary"
-                    className="text-lg px-6 py-2 font-heading bg-primary/10 text-primary border-primary/20"
-                  >
-                    Score: {playerScore}
-                  </Badge>
-                  {currentPlayer?.hasPublishedScore && (
-                    <motion.p
-                      initial={{ scale: 0.9, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      className="text-sm font-semibold text-green-600 font-body flex items-center justify-center gap-2"
-                    >
-                      <Eye className="w-4 h-4" />
-                      Score published!
-                    </motion.p>
-                  )}
-                </div>
-              ) : (
+              <Card className="p-8 text-center glass-dark border-accent/30 rounded-2xl">
+                <p className="mb-4 font-body font-medium text-accent drop-shadow-[0_0_8px_rgba(234,88,12,0.5)]">
+                  All players have published their scores!
+                </p>
                 <Button
-                  onClick={publishScore}
-                  className="font-body gaming-button px-8"
-                  disabled={currentPlayer?.hasPublishedScore}
+                  onClick={() => setShowRoundResult(true)}
+                  className="font-body px-8 neon-border-glow-accent neon-pulse bg-accent hover:bg-accent/90 text-white"
                 >
-                  {currentPlayer?.hasPublishedScore
-                    ? "Score Published"
-                    : "Publish Score"}
+                  View Results
                 </Button>
-              )}
+              </Card>
             </motion.div>
           )}
-        </div>
-      </Card>
+        </AnimatePresence>
+      </div>
 
-      {/* All Players Published - Show Round Results */}
-      <AnimatePresence>
-        {allPlayersPublished && !showRoundResult && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-          >
-            <Card className="p-6 text-center border-accent/20 bg-accent/5">
-              <p className="mb-4 font-body font-medium text-accent">
-                All players have published their scores!
-              </p>
-              <Button
-                onClick={handleViewRoundResult}
-                className="font-body gaming-button"
+      {/* Side Roster */}
+      <div className="w-full md:w-80 shrink-0 hidden md:block">
+        <PlayerRoster onKickPlayer={handleKickPlayer} />
+      </div>
+
+      {/* Mobile Roster Drawer placeholder / could render absolute pinned to bottom in mobile */}
+      <div className="w-full md:hidden fixed bottom-0 left-0 right-0 max-h-[40vh] z-40">
+        {/* We can make it collapsible, but for now just drop it into the flow */}
+      </div>
+      <div className="w-full md:hidden mt-4">
+        <PlayerRoster onKickPlayer={handleKickPlayer} />
+      </div>
+    </div>
+  );
+};
+
+const GameEndOverlay: React.FC<{
+  players: GamePlayer[];
+}> = ({ players }) => {
+  return (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+      {/* Animated gradient bg */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10 animate-pulse pointer-events-none" />
+
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="w-full max-w-2xl relative z-10"
+      >
+        <Card className="p-8 glass-dark border-primary/30 rounded-3xl overflow-hidden">
+          <div className="text-center relative z-10">
+            {/* Trophy with glow */}
+            <motion.div
+              initial={{ rotate: -10, scale: 0.8 }}
+              animate={{ rotate: 0, scale: 1 }}
+              transition={{ type: "spring" }}
+              className="relative inline-block"
+            >
+              <Trophy className="w-20 h-20 mx-auto mb-4 text-yellow-400 drop-shadow-[0_0_20px_rgba(250,204,21,0.6)]" />
+              <motion.div
+                className="absolute -top-1 -right-1"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
               >
-                View Round Results
-              </Button>
-            </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                <Sparkles className="w-6 h-6 text-yellow-300" />
+              </motion.div>
+            </motion.div>
+
+            {/* Glitch title */}
+            <motion.h2
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-5xl font-bold font-heading mb-6 text-accent drop-shadow-[0_0_20px_rgba(234,88,12,0.7)] glitch-text"
+            >
+              GAME OVER
+            </motion.h2>
+
+
+
+            {/* Final Scores */}
+            <div className="mb-8 flex flex-col">
+              <h3 className="text-lg font-semibold mb-4 font-heading text-slate-300 uppercase tracking-widest shrink-0">
+                Final Scores
+              </h3>
+              <div className="space-y-3 max-h-[50vh] overflow-y-auto px-2 -mx-2 py-2">
+              {players
+                .sort((a, b) => b.cumulatedScore - a.cumulatedScore)
+                .map((p, index) => (
+                  <motion.div
+                    key={p.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.5 + index * 0.1 }}
+                    className={`flex items-center justify-between p-4 rounded-xl ${
+                      index === 0
+                        ? "bg-yellow-500/10 border border-yellow-500/30"
+                        : index === 1
+                          ? "bg-slate-400/10 border border-slate-400/30"
+                          : index === 2
+                            ? "bg-amber-600/10 border border-amber-600/30"
+                            : "bg-slate-800/50 border border-slate-700/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {index === 0 && (
+                        <Trophy className="w-5 h-5 text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.5)]" />
+                      )}
+                      <span className="font-medium text-lg font-body text-white">
+                        {p.name}
+                      </span>
+                    </div>
+                    <Badge
+                      className={`font-mono text-lg px-4 ${
+                        index === 0
+                          ? "bg-yellow-500/20 text-yellow-300 neon-border-glow-accent"
+                          : "bg-primary/20 text-primary"
+                      }`}
+                    >
+                      {p.cumulatedScore} pts
+                    </Badge>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+
+            <Button
+              onClick={() => (window.location.href = "/")}
+              className="font-body px-10 py-6 text-lg neon-border-glow-accent neon-pulse bg-accent hover:bg-accent/90 text-white"
+            >
+              Back to Home
+            </Button>
+          </div>
+        </Card>
+      </motion.div>
     </div>
   );
 };

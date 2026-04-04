@@ -5,13 +5,13 @@ export class ScoreService {
   // Calculate score changes for a game
   static calculateScoreChanges(
     winnerId: string,
-    playerIds: string[]
+    playerIds: string[],
   ): { playerId: string; change: number }[] {
-    const loserCount = playerIds.filter(id => id !== winnerId).length;
+    const loserCount = playerIds.filter((id) => id !== winnerId).length;
     const winnerPoints = loserCount * 5;
     const loserPoints = -5;
 
-    return playerIds.map(playerId => ({
+    return playerIds.map((playerId) => ({
       playerId,
       change: playerId === winnerId ? winnerPoints : loserPoints,
     }));
@@ -33,7 +33,7 @@ export class ScoreService {
       .orderBy(desc(players.totalScore))
       .limit(limit);
 
-    return topPlayers.map(player => ({
+    return topPlayers.map((player) => ({
       ...player,
       winRate: player.totalGames > 0 ? player.winRate : 0,
     }));
@@ -65,7 +65,9 @@ export class ScoreService {
         rank: sql<number>`COUNT(*) + 1`,
       })
       .from(players)
-      .where(sql`${players.totalScore} > (SELECT ${players.totalScore} FROM ${players} WHERE ${players.id} = ${playerId})`);
+      .where(
+        sql`${players.totalScore} > (SELECT ${players.totalScore} FROM ${players} WHERE ${players.id} = ${playerId})`,
+      );
 
     return result[0]?.rank || 1;
   }
@@ -84,13 +86,15 @@ export class ScoreService {
       .leftJoin(gamePlayers, eq(games.id, gamePlayers.gameId))
       .where(eq(games.roomId, roomId));
 
-    return stats[0] || {
-      totalGames: 0,
-      avgWinnerScore: 0,
-      highestWinScore: 0,
-      totalPointsAwarded: 0,
-      totalPointsLost: 0,
-    };
+    return (
+      stats[0] || {
+        totalGames: 0,
+        avgWinnerScore: 0,
+        highestWinScore: 0,
+        totalPointsAwarded: 0,
+        totalPointsLost: 0,
+      }
+    );
   }
 
   // Get players with highest win streaks
@@ -113,14 +117,12 @@ export class ScoreService {
 
   // Reset all scores (for testing/tournaments)
   static async resetAllScores(): Promise<void> {
-    await db
-      .update(players)
-      .set({
-        totalScore: 0,
-        totalGames: 0,
-        totalWins: 0,
-        totalLosses: 0,
-        currentStreak: 0,
-      });
+    await db.update(players).set({
+      totalScore: 0,
+      totalGames: 0,
+      totalWins: 0,
+      totalLosses: 0,
+      currentStreak: 0,
+    });
   }
 }

@@ -8,15 +8,18 @@ export class RoomService {
   static async createRoom(
     name: string,
     hostId: string,
-    maxPlayers: number = 12,
+    maxPlayers: number = 17,
   ): Promise<Room & { roomCode: string }> {
+    // Enforce hard cap
+    const safeMaxPlayers = Math.min(maxPlayers, 17);
+
     // Generate unique room code
     const roomCode = await RoomCodeService.generateRoomCode();
 
     const newRoom: NewRoom = {
       id: generateRoomId(),
       name,
-      maxPlayers,
+      maxPlayers: safeMaxPlayers,
       roomCode,
       hostId,
       status: "waiting",

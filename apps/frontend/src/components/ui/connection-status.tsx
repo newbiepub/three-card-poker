@@ -1,6 +1,6 @@
-import { Wifi, WifiOff } from 'lucide-react';
-import { Badge } from './badge';
-import { useWebSocketStore } from '@/store';
+import { Wifi, WifiOff } from "lucide-react";
+import { Badge } from "./badge";
+import { useWebSocketStore } from "@/store";
 
 export function ConnectionStatus() {
   const { isConnected, error } = useWebSocketStore();
@@ -8,7 +8,10 @@ export function ConnectionStatus() {
   return (
     <div className="fixed top-4 right-4 z-50">
       {isConnected ? (
-        <Badge variant="secondary" className="gap-2 bg-green-100 text-green-800">
+        <Badge
+          variant="secondary"
+          className="gap-2 bg-green-100 text-green-800"
+        >
           <Wifi className="w-4 h-4" />
           Connected
         </Badge>

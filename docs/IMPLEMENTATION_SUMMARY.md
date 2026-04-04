@@ -3,18 +3,21 @@
 ## New Features Added
 
 ### 1. Player Registration System
+
 - **Name Entry**: Players enter name on first visit
 - **LocalStorage**: Name saved locally for convenience
 - **Database Sync**: Player profiles created/synced with database
 - **Persistent Identity**: Players maintain scores across sessions
 
 ### 2. Enhanced Room System
+
 - **6-Digit Room Codes**: Simple numeric codes (e.g., "123456")
 - **Host Controls**: Room creator has special permissions
 - **Player List**: All players in room are visible
 - **Join by Code**: Players enter code to join specific rooms
 
 ### 3. Session Management
+
 - **Configurable Rounds**: Host sets number of rounds (1-20)
 - **Sequential Gameplay**: Rounds played one after another
 - **Accumulated Scoring**: Scores add up across rounds
@@ -23,6 +26,7 @@
 ## Technical Implementation
 
 ### Frontend Components
+
 ```
 src/
 ├── components/
@@ -49,6 +53,7 @@ src/
 ```
 
 ### Backend Services
+
 ```typescript
 // New services needed
 - SessionService     # Manage game sessions
@@ -58,6 +63,7 @@ src/
 ```
 
 ### Database Updates
+
 ```sql
 -- New tables
 CREATE TABLE sessions (
@@ -90,6 +96,7 @@ ALTER TABLE rooms ADD COLUMN current_session_id TEXT NULL;
 ## User Flow
 
 ### New Player Experience
+
 1. Open app → Enter name → Saved to localStorage
 2. Choose: Create Room or Join Room
 3. If creating: Set round count → Get 6-digit code
@@ -97,6 +104,7 @@ ALTER TABLE rooms ADD COLUMN current_session_id TEXT NULL;
 5. Wait for host to start → Play rounds → See final scores
 
 ### Host Experience
+
 1. Create room → Set number of rounds
 2. Share 6-digit code with friends
 3. See players join in real-time
@@ -108,18 +116,21 @@ ALTER TABLE rooms ADD COLUMN current_session_id TEXT NULL;
 ## Implementation Priority
 
 ### Phase 1: Core Features
+
 1. Player registration with localStorage
 2. Room creation with 6-digit codes
 3. Basic room lobby with player list
 4. Host controls for starting games
 
 ### Phase 2: Session Management
+
 1. Round counter and progression
 2. Score accumulation across rounds
 3. Session reset functionality
 4. Enhanced leaderboard
 
 ### Phase 3: Polish
+
 1. Animations and transitions
 2. Mobile optimization
 3. Room history/recent rooms
@@ -127,7 +138,7 @@ ALTER TABLE rooms ADD COLUMN current_session_id TEXT NULL;
 
 ## Key Technical Decisions
 
-1. **LocalStorage Strategy**: 
+1. **LocalStorage Strategy**:
    - Store player name and ID locally
    - Sync with database on load
    - Allow guest mode (no persistence)

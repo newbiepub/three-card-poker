@@ -12,8 +12,9 @@
     "build": "bun run --filter build",
     "test": "bun run --filter test",
     "clean": "bun run --filter clean",
-    "lint": "bun run --filter lint",
-    "type-check": "bun run --filter type-check"
+    "lint": "bun run --filter \"*\" lint",
+    "lint:fix": "bun run --filter \"*\" lint --fix",
+    "type-check": "bun run --filter \"*\" type-check"
   },
   "devDependencies": {
     "@types/bun": "latest",

@@ -1,31 +1,17 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiClient } from "./client";
-import { queryKeys } from "./queryKeys";
 import type { Session } from "@/types";
-import type { Card } from "@three-card-poker/shared";
+import type { Card, Pile } from "@three-card-poker/shared";
 
-interface StartSessionRequest {
+interface ClaimPileRequest {
   sessionId: string;
-  hostId: string;
-}
-
-interface NextRoundRequest {
-  sessionId: string;
-  expectedCurrentRound?: number;
-  totalRounds?: number;
-}
-
-interface DrawCardRequest {
-  sessionId: string;
+  roundNumber: number;
+  pileId: string;
   playerId: string;
 }
 
-interface DrawCardResponse {
-  card: Card;
-  hand: Card[];
-  score: number | null;
-  remaining: number;
-  playerId: string;
+interface ClaimPileResponse {
+  pile: Pile;
 }
 
 interface PublishScoreRequest {
@@ -56,66 +42,18 @@ interface SessionStateResponse {
   }>;
 }
 
-export function useStartSession() {
-  return useMutation({
-    mutationFn: async ({ sessionId, hostId }: StartSessionRequest) => {
-      const response = await apiClient.post(`/sessions/${sessionId}/start`, {
-        hostId,
-      });
-      return response;
-    },
-  });
-}
-
-export function useNextRound() {
+// Claim a pile from server
+export function useClaimPile() {
   return useMutation({
     mutationFn: async ({
       sessionId,
-      expectedCurrentRound,
-      totalRounds,
-    }: NextRoundRequest) => {
-      const response = await apiClient.post(
-        `/sessions/${sessionId}/next-round`,
-        {
-          expectedCurrentRound,
-          totalRounds,
-        },
-      );
-      return response;
-    },
-  });
-}
-
-export function useResetSession() {
-  return useMutation({
-    mutationFn: async ({
-      sessionId,
-      hostId,
-      newTotalRounds,
-    }: {
-      sessionId: string;
-      hostId: string;
-      newTotalRounds?: number;
-    }) => {
-      const response = await apiClient.post(`/sessions/${sessionId}/reset`, {
-        hostId,
-        newTotalRounds,
-      });
-      return response;
-    },
-  });
-}
-
-// Draw a single card from server
-export function useDrawCard() {
-  return useMutation({
-    mutationFn: async ({
-      sessionId,
+      roundNumber,
+      pileId,
       playerId,
-    }: DrawCardRequest): Promise<DrawCardResponse> => {
-      const response = await apiClient.post<DrawCardResponse>(
-        `/sessions/${sessionId}/draw-card`,
-        { playerId },
+    }: ClaimPileRequest): Promise<ClaimPileResponse> => {
+      const response = await apiClient.post<ClaimPileResponse>(
+        `/sessions/${sessionId}/claim-pile`,
+        { roundNumber, pileId, playerId },
       );
       return response;
     },
@@ -181,23 +119,5 @@ export function useSessionState(sessionId: string | undefined, enabled = true) {
     },
     enabled: enabled && !!sessionId,
     refetchInterval: false,
-  });
-}
-
-export function useSessionLeaderboard(sessionId: string) {
-  return useQuery({
-    queryKey: queryKeys.sessions.leaderboard(sessionId),
-    queryFn: () => apiClient.get(`/sessions/${sessionId}/leaderboard`),
-    enabled: !!sessionId,
-    staleTime: 10 * 1000, // 10 seconds
-  });
-}
-
-export function useSessionHistory(sessionId: string) {
-  return useQuery({
-    queryKey: queryKeys.sessions.history(sessionId),
-    queryFn: () => apiClient.get(`/sessions/${sessionId}/history`),
-    enabled: !!sessionId,
-    staleTime: 5 * 1000, // 5 seconds
   });
 }
