@@ -83,10 +83,11 @@ interface WebSocketState {
   playerId: string
 }
 
-// Start the game
+// Next round signal (Host only)
 {
-  type: 'startGame',
-  roomCode: string
+  type: 'nextRound',
+  round: number,
+  allScores: CumulativeScore[] // Optional: Latest score per player for sync
 }
 
 // Reveal cards

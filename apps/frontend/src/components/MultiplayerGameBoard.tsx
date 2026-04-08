@@ -196,6 +196,7 @@ export const MultiplayerGameBoard: React.FC = () => {
         playerId: player.id,
         score: calculatedScore,
         roundNumber: currentRound,
+        cards: myHand as CardType[],
       });
 
       publishPlayerScore(
@@ -231,13 +232,6 @@ export const MultiplayerGameBoard: React.FC = () => {
 
       const nextRoundNumber =
         response?.session?.currentRound ?? currentRound + 1;
-
-      if (response?.allScores) {
-        syncPlayerCumulativeScores(response.allScores.map((score: Record<string, unknown>) => ({
-          playerId: score.playerId as string,
-          cumulatedScore: score.cumulativeScore as number,
-        })));
-      }
 
       send({
         type: "nextRound",
@@ -286,14 +280,8 @@ export const MultiplayerGameBoard: React.FC = () => {
   }
 
   const currentPlayer = players.find((p) => p.id === player?.id);
-  const myPile:
-    | {
-        id: string;
-        cards: CardType[];
-        claimedBy: string | null;
-        claimedAt: number | null;
-      }
-    | undefined = piles.find((p) => p.claimedBy === player?.id);
+  const myPile = piles.find((p) => p.claimedBy === player?.id) as import("@three-card-poker/shared").Pile | undefined;
+  const selectedPileId: string | null = myPile?.id ?? null;
   const playerHand = myPile?.cards || currentPlayer?.hand || [];
   const showSwipeArea = !!myPile;
 
@@ -342,7 +330,7 @@ export const MultiplayerGameBoard: React.FC = () => {
               piles={piles}
               onClaimPile={handleClaimPile}
               isClaiming={false}
-              selectedPileId={myPile?.id || null}
+              selectedPileId={selectedPileId}
             />
           </Card>
         )}
@@ -434,7 +422,7 @@ const GameEndOverlay: React.FC<{
               <h3 className="text-lg font-semibold mb-4 font-heading text-slate-300 uppercase tracking-widest shrink-0">
                 Final Scores
               </h3>
-              <div className="space-y-3 max-h-[50vh] overflow-y-auto px-2 -mx-2 py-2">
+              <div className="space-y-3 max-h-[50vh] overflow-y-auto px-2 -mx-2 py-2 custom-scrollbar">
               {players
                 .sort((a, b) => b.cumulatedScore - a.cumulatedScore)
                 .map((p, index) => (
@@ -443,7 +431,7 @@ const GameEndOverlay: React.FC<{
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.5 + index * 0.1 }}
-                    className={`flex items-center justify-between p-4 rounded-xl ${
+                    className={`flex items-center justify-between gap-4 p-4 rounded-xl ${
                       index === 0
                         ? "bg-yellow-500/10 border border-yellow-500/30"
                         : index === 1
@@ -453,16 +441,16 @@ const GameEndOverlay: React.FC<{
                             : "bg-slate-800/50 border border-slate-700/50"
                     }`}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                       {index === 0 && (
-                        <Trophy className="w-5 h-5 text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.5)]" />
+                        <Trophy className="w-5 h-5 shrink-0 text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.5)]" />
                       )}
-                      <span className="font-medium text-lg font-body text-white">
+                      <span className="font-medium text-lg font-body text-white block truncate">
                         {p.name}
                       </span>
                     </div>
                     <Badge
-                      className={`font-mono text-lg px-4 ${
+                      className={`font-mono text-lg px-4 shrink-0 ${
                         index === 0
                           ? "bg-yellow-500/20 text-yellow-300 neon-border-glow-accent"
                           : "bg-primary/20 text-primary"

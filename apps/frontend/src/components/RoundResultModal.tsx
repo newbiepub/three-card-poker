@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { type GamePlayer } from "@/store";
-import { compareHands, evaluateHand } from "@three-card-poker/shared";
+import { compareHands, evaluateHand, type Card as PlayingCardType } from "@three-card-poker/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, Crown, Sparkles, TrendingUp, Trophy } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -47,12 +47,12 @@ export function RoundResultModal({
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: "spring", damping: 25, stiffness: 200 }}
-        className="w-full max-w-2xl"
+        className="w-full max-w-2xl h-[90vh] flex flex-col"
       >
-        <Card className="relative overflow-hidden glass-dark border-primary/30 rounded-3xl">
-          <div className="p-8">
+        <Card className="relative overflow-hidden glass-dark border-primary/30 rounded-3xl flex flex-col h-full">
+          <div className="p-8 flex flex-col h-full">
             {/* Winner Section */}
-            <div className="text-center mb-8">
+            <div className="text-center mb-8 shrink-0">
               <motion.div
                 className="relative inline-block mb-4"
                 initial={{ rotate: -20, scale: 0 }}
@@ -84,14 +84,14 @@ export function RoundResultModal({
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                className="flex flex-col items-center gap-3"
+                className="flex flex-col items-center gap-3 w-full"
               >
-                <div className="flex items-center gap-3 px-6 py-2 rounded-full bg-primary/10 border border-primary/30 neon-border-glow">
-                  <Crown className="w-6 h-6 text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.5)]" />
-                  <span className="text-2xl font-bold text-white drop-shadow-[0_0_8px_rgba(13,148,136,0.8)] font-heading">
+                <div className="flex items-center justify-center gap-3 px-6 py-2 rounded-full bg-primary/10 border border-primary/30 neon-border-glow max-w-full">
+                  <Crown className="w-6 h-6 shrink-0 text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.5)]" />
+                  <span className="text-2xl font-bold text-white drop-shadow-[0_0_8px_rgba(13,148,136,0.8)] font-heading truncate">
                     {roundWinner?.name}
                   </span>
-                  <Crown className="w-6 h-6 text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.5)]" />
+                  <Crown className="w-6 h-6 shrink-0 text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.5)]" />
                 </div>
 
                 <div className="text-4xl font-black text-accent font-heading flicker drop-shadow-[0_0_12px_rgba(234,88,12,0.5)]">
@@ -101,7 +101,7 @@ export function RoundResultModal({
             </div>
 
             {/* Scoreboard */}
-            <div className="mb-8">
+            <div className="flex-1 overflow-y-auto mb-8 pr-2 custom-scrollbar">
               <h3 className="text-sm font-bold mb-4 text-center text-muted-foreground uppercase tracking-widest font-heading">
                 Round Rankings
               </h3>
@@ -113,15 +113,15 @@ export function RoundResultModal({
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.5 + index * 0.1 }}
-                      className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
+                      className={`flex items-center justify-between gap-4 p-4 rounded-xl border transition-all ${
                         index === 0
                           ? "bg-yellow-500/10 border-yellow-500/30 neon-border-glow-accent"
                           : "bg-slate-800/50 border-slate-700/50"
                       }`}
                     >
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-4 min-w-0 flex-1">
                         <span
-                          className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold font-heading ${
+                          className={`w-8 h-8 rounded-lg shrink-0 flex items-center justify-center font-bold font-heading ${
                             index === 0
                               ? "bg-yellow-500 text-slate-900"
                               : "bg-slate-700 text-slate-300"
@@ -130,15 +130,15 @@ export function RoundResultModal({
                           {index + 1}
                         </span>
 
-                        <div className="flex flex-col">
+                        <div className="flex flex-col min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="font-bold font-heading text-white">
+                            <span className="font-bold font-heading text-white block truncate">
                               {player.name}
                             </span>
                             {player.hand && player.hand.length === 3 && (
                               <Badge
                                 variant="outline"
-                                className="text-[10px] uppercase font-bold text-primary"
+                                className="text-[10px] shrink-0 uppercase font-bold text-primary"
                               >
                                 {evaluateHand(player.hand).type === "baTien"
                                   ? "Ba Tây"
@@ -152,11 +152,11 @@ export function RoundResultModal({
                           </div>
 
                           {/* Player's cards minified */}
-                          <div className="flex gap-1 mt-1.5">
-                            {(player.hand || []).map((card, idx) => (
+                          <div className="flex gap-1 mt-1.5 shrink-0">
+                            {(player.hand || []).map((card: PlayingCardType, idx: number) => (
                               <div
                                 key={idx}
-                                className="w-6 h-9 rounded border border-border bg-white flex flex-col items-center justify-center shadow-xs"
+                                className="w-6 h-9 rounded border border-border bg-white flex flex-col items-center justify-center shadow-xs shrink-0"
                               >
                                 <span
                                   className={`text-[10px] font-bold ${
@@ -183,7 +183,7 @@ export function RoundResultModal({
                         </div>
                       </div>
 
-                      <div className="flex flex-col items-end">
+                      <div className="flex flex-col items-end shrink-0 ml-2">
                         <div className="flex items-center gap-2">
                           <span
                             className={`text-2xl font-black font-heading ${

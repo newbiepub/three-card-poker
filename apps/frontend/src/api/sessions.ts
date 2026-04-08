@@ -19,6 +19,7 @@ interface PublishScoreRequest {
   playerId: string;
   score: number;
   roundNumber?: number;
+  cards?: Card[];
 }
 
 interface SessionStateResponse {
@@ -68,6 +69,7 @@ export function usePublishScore() {
       playerId,
       score,
       roundNumber,
+      cards,
     }: PublishScoreRequest) => {
       const response = await apiClient.post(
         `/sessions/${sessionId}/publish-score`,
@@ -75,6 +77,7 @@ export function usePublishScore() {
           playerId,
           score,
           roundNumber,
+          cards,
         },
       );
       return response;

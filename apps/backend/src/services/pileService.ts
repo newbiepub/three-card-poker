@@ -5,7 +5,6 @@ import {
   createPiles,
   createDeck,
   shuffle,
-  type Card,
 } from "@three-card-poker/shared";
 
 export class PileService {

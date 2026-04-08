@@ -3,21 +3,15 @@ import {
   db,
   sessions,
   sessionScores,
-  sessionDecks,
-  sessionHands,
   rooms,
   players,
   type Session,
   type NewSession,
   type SessionScore,
   type NewSessionScore,
-  type NewSessionDeck,
-  type NewSessionHand,
 } from "../db";
 import {
   generateSessionId,
-  createDeck,
-  shuffle,
   calculateScore,
   evaluateHand,
   determineWinner,
@@ -402,6 +396,7 @@ export class SessionService {
     playerId: string,
     roundNumber: number,
     score: number,
+    cards?: any[] | null,
   ): Promise<SessionScore> {
     const existingScores = await db
       .select()
@@ -427,13 +422,14 @@ export class SessionService {
       .limit(1);
 
     if (existingScore.length > 0) {
+      const updateData: any = { gameScore: score };
+      if (cards) {
+        updateData.cards = JSON.stringify(cards);
+      }
+
       const [updatedScore] = await db
         .update(sessionScores)
-        .set({
-          gameScore: score,
-          // Do not reset pointsChange if it's already set (prevents race conditions with recalculateRoundPoints)
-          // pointsChange: 0,
-        })
+        .set(updateData)
         .where(eq(sessionScores.id, scoreId))
         .returning();
 
@@ -447,6 +443,7 @@ export class SessionService {
       playerId,
       roundNumber,
       gameScore: score,
+      cards: cards ? JSON.stringify(cards) : null,
       pointsChange: 0,
       cumulativeScore: lastCumulative,
     };

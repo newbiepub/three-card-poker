@@ -1,4 +1,4 @@
-import { db, rooms } from "../db";
+import { db } from "../db";
 
 export class RoomCodeService {
   // Generate a unique 6-digit room code

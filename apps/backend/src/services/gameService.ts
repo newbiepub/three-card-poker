@@ -1,4 +1,4 @@
-import { eq, and, sql, desc } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import {
   db,
   games,
@@ -11,7 +11,6 @@ import {
 } from "../db";
 import {
   generateGameId,
-  generateRoomId,
   type Card,
 } from "@three-card-poker/shared";
 

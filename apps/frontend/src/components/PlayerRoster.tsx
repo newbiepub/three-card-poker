@@ -22,13 +22,13 @@ export const PlayerRoster: React.FC<PlayerRosterProps> = ({ onKickPlayer }) => {
       const gp = gamePlayers.find((g) => g.id === p.id);
       return {
         ...p,
-        totalScore: gp?.totalScore ?? 0,
+        cumulatedScore: gp?.cumulatedScore ?? 0,
         score: gp?.score ?? null,
         hasPublishedScore: gp?.hasPublishedScore ?? false,
         hand: gp?.hand ?? [],
       };
     })
-    .sort((a, b) => b.totalScore - a.totalScore);
+    .sort((a, b) => b.cumulatedScore - a.cumulatedScore);
 
   return (
     <Card className="p-4 glass-dark h-full flex flex-col rounded-2xl border-l-2 border-l-primary/50">
@@ -55,9 +55,9 @@ export const PlayerRoster: React.FC<PlayerRosterProps> = ({ onKickPlayer }) => {
                     : "border-slate-700/50 bg-slate-800/50 hover:border-primary/30 hover:bg-slate-800"
                 }`}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
                   {/* Status dot */}
-                  <div className="relative flex h-3 w-3">
+                  <div className="relative flex h-3 w-3 shrink-0">
                     <span
                       className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${status === "online" ? "bg-green-400" : "bg-gray-400"}`}
                     ></span>
@@ -66,16 +66,16 @@ export const PlayerRoster: React.FC<PlayerRosterProps> = ({ onKickPlayer }) => {
                     ></span>
                   </div>
 
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium font-body text-white">{p.name}</span>
+                      <span className="font-medium font-body text-white truncate block">{p.name}</span>
                       {isMe && (
-                        <span className="text-[10px] uppercase text-muted-foreground tracking-wider font-heading">
+                        <span className="text-[10px] uppercase text-muted-foreground tracking-wider font-heading shrink-0">
                           (You)
                         </span>
                       )}
                       {p.id === room?.hostId && (
-                        <Trophy className="w-3 h-3 text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.6)]" />
+                        <Trophy className="w-3 h-3 text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.6)] shrink-0" />
                       )}
 
                       {isHost && !isMe && p.id !== room?.hostId && (
@@ -84,23 +84,23 @@ export const PlayerRoster: React.FC<PlayerRosterProps> = ({ onKickPlayer }) => {
                             e.stopPropagation();
                             onKickPlayer(p.id);
                           }}
-                          className="p-1 rounded hover:bg-red-100 hover:text-red-500 transition-colors"
+                          className="p-1 rounded hover:bg-red-100 hover:text-red-500 transition-colors shrink-0"
                           title="Kick player"
                         >
-                          <X className="w-3 h-3" />
+                          <X className="w-3 h-3 shrink-0" />
                         </button>
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5 font-mono">
-                      {p.totalScore} pts
+                      {p.cumulatedScore} pts
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   {p.hasPublishedScore && (
                     <Badge
-                      className="font-mono bg-green-500/20 text-green-400 border border-green-500/30 shadow-[0_0_8px_rgba(34,197,94,0.3)]"
+                      className="font-mono bg-green-500/20 text-green-400 border border-green-500/30 shadow-[0_0_8px_rgba(34,197,94,0.3)] shrink-0"
                     >
                       {p.score ?? 0}
                     </Badge>

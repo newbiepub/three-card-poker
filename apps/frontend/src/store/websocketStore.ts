@@ -2,7 +2,8 @@ import { create } from "zustand";
 import { useRoomStore } from "./roomStore";
 import { useGameStore } from "./gameStore";
 import type { Room, Session } from "@/types";
-import type { Player } from "@three-card-poker/shared";
+import type { Card, Pile, Player } from "@three-card-poker/shared";
+import { toast } from "sonner";
 
 interface WebSocketState {
   ws: WebSocket | null;
@@ -14,11 +15,13 @@ interface WebSocketState {
   send: (data: Record<string, unknown>) => void;
 }
 
-// Keep track of reconnect attempts outside component state to survive unmounts
+// Keep track of reconnect state outside component state to survive unmounts
 let reconnectAttempt = 0;
 const MAX_RECONNECT_ATTEMPTS = 10;
-let reconnectTimer: NodeJS.Timeout | null = null;
-let heartbeatTimer: NodeJS.Timeout | null = null;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+// Explicit flag so onclose doesn't auto-reconnect after intentional disconnect
+let intentionalDisconnect = false;
 
 const startHeartbeat = (ws: WebSocket, playerId: string) => {
   if (heartbeatTimer) clearInterval(heartbeatTimer);
@@ -26,7 +29,7 @@ const startHeartbeat = (ws: WebSocket, playerId: string) => {
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "heartbeat", playerId }));
     }
-  }, 15000); // 15 seconds
+  }, 15000);
 };
 
 const stopHeartbeat = () => {
@@ -35,6 +38,23 @@ const stopHeartbeat = () => {
     heartbeatTimer = null;
   }
 };
+
+/** Build the WebSocket URL based on env config */
+function buildWsUrl(): string {
+  const wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+
+  if (import.meta.env.VITE_API_HOST) {
+    // Direct backend connection — replace http(s) with ws(s)
+    const base = (import.meta.env.VITE_API_HOST as string).replace(
+      /^https?/,
+      wsProtocol,
+    );
+    return base.endsWith("/") ? base : `${base}/`;
+  }
+
+  // Via Vite dev proxy at /ws/
+  return `${wsProtocol}://${window.location.host}/ws/`;
+}
 
 export const useWebSocketStore = create<WebSocketState>((set, get) => ({
   ws: null,
@@ -45,40 +65,20 @@ export const useWebSocketStore = create<WebSocketState>((set, get) => ({
   connect: (roomCode: string, playerId: string) => {
     const { ws, isConnected, isConnecting } = get();
 
-    if (isConnected || isConnecting) {
-      return;
-    }
+    if (isConnected || isConnecting) return;
 
     if (ws?.readyState === WebSocket.OPEN) {
       ws.close();
     }
 
+    intentionalDisconnect = false;
     set({ isConnecting: true });
 
-    const wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
-    let wsUrl = "";
-    if (import.meta.env.VITE_API_HOST) {
-      // Ensure we replace http with ws correctly
-      wsUrl = import.meta.env.VITE_API_HOST.replace(/^http/, "ws");
-    } else {
-      wsUrl = `${wsProtocol}://${window.location.host}`;
-    }
-    // Also we MUST append / to match backend URL pathname === "/"
-    // BUT the backend proxy in vite uses /ws. Actually let's just make the backend accept /ws/ instead to be robust!
-    // But since backend accepts "/", let's just use "/" if connecting directly, or "/ws/" if proxy. 
-    // Wait, let's just make the backend accept /ws/ AND /, and fix URL here:
-    wsUrl = wsUrl.endsWith("/") ? wsUrl : `${wsUrl}/`;
-    
-    // In dev, the direct hit is ws://localhost:3001/
-    // If going through proxy, we use current host /ws/
-    // VITE_API_HOST bypassing proxy goes straight to backend. Backend expects /. 
-    const finalUrl = import.meta.env.VITE_API_HOST ? wsUrl : `${wsProtocol}://${window.location.host}/ws/`;
-    
-    const newWs = new WebSocket(finalUrl);
+    const newWs = new WebSocket(buildWsUrl());
 
     newWs.onopen = () => {
       set({ ws: newWs, isConnected: true, isConnecting: false, error: null });
-      reconnectAttempt = 0; // reset on successful connection
+      reconnectAttempt = 0;
       if (reconnectTimer) {
         clearTimeout(reconnectTimer);
         reconnectTimer = null;
@@ -97,138 +97,137 @@ export const useWebSocketStore = create<WebSocketState>((set, get) => ({
 
     newWs.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data) as Record<string, unknown>;
+        const data = JSON.parse(event.data as string) as Record<string, unknown>;
 
         const roomStore = useRoomStore.getState();
         const gameStore = useGameStore.getState();
 
         switch (data.type) {
-          case "roomJoined":
-          case "reconnectState":
-            if (data.room) {
-              const players = data.players as Player[];
-              const snapshot = data.snapshot as
-                | Record<string, unknown>
-                | undefined;
+          // Backend always sends roomJoined (even on reconnect — carries snapshot when in-game)
+          case "roomJoined": {
+            if (!data.room) break;
 
-              roomStore.setRoom(
-                data.room as Room,
-                (data.session as Session) || null,
-                (data.isHost as boolean) || false,
-                playerId,
-                players,
-                snapshot?.presence || {},
+            const players = data.players as Player[];
+            const snapshot = data.snapshot as Record<string, unknown> | undefined;
+
+            roomStore.setRoom(
+              data.room as Room,
+              (data.session as Session) || null,
+              (data.isHost as boolean) || false,
+              playerId,
+              players,
+              (snapshot?.presence as Record<string, "online" | "offline">) || {},
+            );
+
+            gameStore.setPlayers(players);
+
+            const session = data.session as Record<string, unknown> | undefined;
+            if (
+              session?.status === "playing" ||
+              session?.status === "round-end"
+            ) {
+              gameStore.setTotalRounds((session.totalRounds as number) || 10);
+              gameStore.setCurrentRound(session.currentRound as number);
+              // session.status is "playing" | "round-end" — matches GameState["gameStatus"]
+              gameStore.setGameState(
+                session.status as "playing" | "round-end",
               );
 
-              // Always set players in gameStore
-              gameStore.setPlayers(players);
-
-              // Initialize game state if session is playing
-              const session = data.session as
-                | Record<string, unknown>
-                | undefined;
-              if (
-                session?.status === "playing" ||
-                session?.status === "round-end"
-              ) {
-                gameStore.setTotalRounds(session.totalRounds || 10);
-                gameStore.setCurrentRound(session.currentRound);
-                gameStore.setGameState(session.status);
-
-                if (snapshot) {
-                  if (snapshot.scores)
-                    gameStore.syncPlayerScores(
-                      snapshot.scores as Parameters<
-                        typeof gameStore.syncPlayerScores
-                      >[0],
-                    );
-                  if (snapshot.allScores)
-                    gameStore.syncPlayerCumulativeScores(
-                      snapshot.allScores as Parameters<
-                        typeof gameStore.syncPlayerCumulativeScores
-                      >[0],
-                    );
-                  if (snapshot.piles)
-                    gameStore.setPiles(
-                      snapshot.piles as Parameters<
-                        typeof gameStore.setPiles
-                      >[0],
-                    );
-                } else if (session?.scores) {
+              if (snapshot) {
+                if (snapshot.scores)
                   gameStore.syncPlayerScores(
-                    session.scores as Parameters<
+                    snapshot.scores as Parameters<
                       typeof gameStore.syncPlayerScores
                     >[0],
                   );
-                }
+                if (snapshot.allScores)
+                  gameStore.syncPlayerCumulativeScores(
+                    snapshot.allScores as Parameters<
+                      typeof gameStore.syncPlayerCumulativeScores
+                    >[0],
+                  );
+                if (snapshot.piles)
+                  gameStore.setPiles(
+                    snapshot.piles as Pile[],
+                  );
+              } else if (session?.scores) {
+                gameStore.syncPlayerScores(
+                  session.scores as Parameters<
+                    typeof gameStore.syncPlayerScores
+                  >[0],
+                );
               }
-            }
-            break;
-
-          case "playerJoined":
-            if (data.player) {
-              const newPlayer = data.player as Player;
-              useRoomStore.getState().addPlayer(newPlayer);
-              gameStore.setPlayers(useRoomStore.getState().players);
-            }
-            break;
-
-          case "playerLeft":
-            if (data.playerId) {
-              // Don't remove player if game is in progress - they stay for auto-pilot
-              const isGameActive = gameStore.gameStatus === "playing" || gameStore.gameStatus === "round-end";
-
-              if (!isGameActive) {
-                // Only remove player if game hasn't started or has ended
-                useRoomStore.getState().removePlayer(data.playerId as string);
-                gameStore.setPlayers(useRoomStore.getState().players);
-              }
-              // If game is active, player stays in list but presence is already set to "offline"
-            }
-            break;
-
-          case "sessionUpdated":
-            if (data.session) {
-              useRoomStore.getState().updateSession(data.session as Session);
-            }
-            break;
-
-          case "gameStarted": {
-            const currentRoomStore = useRoomStore.getState();
-            if (currentRoomStore.session) {
-              currentRoomStore.updateSession({
-                ...currentRoomStore.session,
-                status: "playing",
-                totalRounds: currentRoomStore.players.length,
-              });
-
-              gameStore.setPlayers(currentRoomStore.players);
-              gameStore.setTotalRounds(
-                currentRoomStore.players.length,
-              );
-              gameStore.setGameState("playing");
             }
             break;
           }
 
-          case "pilesRevealed":
-            if (data.piles)
-              gameStore.setPiles(
-                data.piles as Parameters<typeof gameStore.setPiles>[0],
-              );
+          case "playerJoined": {
+            if (!data.player) break;
+            const newPlayer = data.player as Player;
+            useRoomStore.getState().addPlayer(newPlayer);
+            gameStore.setPlayers(useRoomStore.getState().players);
             break;
+          }
 
-          case "pileClaimed":
+          case "playerLeft": {
+            if (!data.playerId) break;
+            // Keep player in game list if game is active (they stay for auto-pilot)
+            const isGameActive =
+              gameStore.gameStatus === "playing" ||
+              gameStore.gameStatus === "round-end";
+            if (!isGameActive) {
+              useRoomStore.getState().removePlayer(data.playerId as string);
+              gameStore.setPlayers(useRoomStore.getState().players);
+            }
+            break;
+          }
+
+          case "presenceUpdate": {
+            if (!data.playerId || !data.status) break;
+            const status =
+              data.status === "online" || data.status === "offline"
+                ? data.status
+                : "offline";
+            useRoomStore
+              .getState()
+              .updatePlayerPresence(data.playerId as string, status);
+            break;
+          }
+
+          case "gameStarted": {
+            const currentRoomStore = useRoomStore.getState();
+            if (!currentRoomStore.session) break;
+
+            currentRoomStore.updateSession({
+              ...currentRoomStore.session,
+              status: "playing",
+              totalRounds: currentRoomStore.players.length,
+            });
+
+            gameStore.setPlayers(currentRoomStore.players);
+            gameStore.setTotalRounds(currentRoomStore.players.length);
+            gameStore.setGameState("playing");
+            break;
+          }
+
+          case "pilesRevealed": {
+            if (data.piles)
+              gameStore.setPiles(data.piles as Pile[]);
+            break;
+          }
+
+          case "pileClaimed": {
             if (data.pileId && data.playerId) {
               gameStore.claimPile(
                 data.pileId as string,
                 data.playerId as string,
-                data.cards as Parameters<typeof gameStore.claimPile>[2],
+                data.cards as Card[] | undefined,
               );
             }
             break;
+          }
 
-          case "stickerSent":
+          case "stickerSent": {
             if (data.playerId && data.sticker) {
               gameStore.addSticker(
                 data.playerId as string,
@@ -236,84 +235,67 @@ export const useWebSocketStore = create<WebSocketState>((set, get) => ({
               );
             }
             break;
+          }
 
-          case "presenceUpdate":
-            if (data.playerId && data.status) {
-              useRoomStore
-                .getState()
-                .updatePlayerPresence(
-                  data.playerId as string,
-                  data.status as Parameters<
-                    typeof useRoomStore.getState
-                  >[0]["updatePlayerPresence"] extends (
-                    id: string,
-                    s: infer T,
-                  ) => void
-                    ? T
-                    : "online" | "offline",
-                );
-            }
+          case "autoPlayed": {
+            // Player auto-played by server — no frontend state change needed,
+            // the subsequent "playerScore" event carries the actual score.
+            console.log("[WS] Player auto-played:", data.playerId);
             break;
+          }
 
-          case "autoPlayed":
-            // Not strictly needed if `playerScore` behaves correctly but is useful if we want to add an annotation later.
-            console.log("Player auto-played:", data.playerId);
-            break;
-
-          case "playerScore":
+          case "playerScore": {
             if (data.playerId && typeof data.score === "number") {
               gameStore.publishPlayerScore(
                 data.playerId as string,
                 data.score,
                 undefined,
                 undefined,
-                data.cards as Parameters<
-                  typeof gameStore.publishPlayerScore
-                >[4],
+                data.cards as Card[] | undefined,
               );
             }
             break;
+          }
 
-          case "nextRound":
-            if (data.allScores) {
-              gameStore.syncPlayerCumulativeScores(
-                (data.allScores as Array<Record<string, unknown>>).map((score) => ({
-                  playerId: score.playerId as string,
-                  cumulatedScore: score.cumulativeScore as number,
-                }))
-              );
-            }
+          case "nextRound": {
             gameStore.nextRound(
               typeof data.round === "number" ? data.round : undefined,
             );
-            break;
-
-          case "roundEnd": {
-            const winner = gameStore.players.find(
-              (p) => p.id === data.winnerId,
-            );
-            if (winner) gameStore.setRoundWinner(winner);
-            break;
-          }
-
-          case "gameEnd": {
-            const gameWinner = gameStore.players.find(
-              (p) => p.id === data.winnerId,
-            );
-            if (gameWinner) gameStore.setGameWinner(gameWinner);
+            if (data.allScores) {
+              gameStore.syncPlayerCumulativeScores(
+                data.allScores as Parameters<
+                  typeof gameStore.syncPlayerCumulativeScores
+                >[0],
+              );
+            }
             break;
           }
 
-          case "error":
-            set({ error: data.message as string });
-            break;
-
-          case "playerKicked":
+          case "playerKicked": {
             get().disconnect();
             useRoomStore.getState().clearRoom();
             useGameStore.getState().resetGame();
             window.location.href = "/?kicked=true";
             break;
+          }
+
+          case "error": {
+            const errorMsg = data.message as string;
+            set({ error: errorMsg });
+            if (errorMsg.includes("claim") || errorMsg.includes("claimed") || errorMsg.includes("round")) {
+              toast.error(errorMsg, { description: "Race condition conflict! Please try again." });
+            } else {
+              toast.error(errorMsg);
+            }
+            break;
+          }
+
+          // Explicitly ignored — backend sends "connected" on ws.open before joinRoom
+          case "connected":
+            break;
+
+          default:
+            console.warn("[WS] Unhandled event type:", data.type);
         }
       } catch (error) {
         console.error("Failed to parse WebSocket message:", error);
@@ -324,32 +306,27 @@ export const useWebSocketStore = create<WebSocketState>((set, get) => ({
       set({ ws: null, isConnected: false, isConnecting: false });
       stopHeartbeat();
 
-      // Auto-reconnect with exponential backoff if intended (error null means it wasn't a deliberate disconnect)
-      const currentError = get().error;
-      if (currentError === null) {
-        if (reconnectAttempt < MAX_RECONNECT_ATTEMPTS) {
-          const baseDelay = Math.min(
-            1000 * Math.pow(2, reconnectAttempt),
-            30000,
-          );
-          const jitter = Math.random() * 1000;
-          const delay = baseDelay + jitter;
-          reconnectAttempt++;
+      if (intentionalDisconnect) return;
 
-          console.log(
-            `WebSocket closed. Reconnecting in ${Math.round(delay)}ms... (Attempt ${reconnectAttempt})`,
-          );
-          reconnectTimer = setTimeout(() => {
-            get().connect(roomCode, playerId);
-          }, delay);
-        } else {
-          set({ error: "Connection lost. Please refresh." });
-        }
+      if (reconnectAttempt < MAX_RECONNECT_ATTEMPTS) {
+        const baseDelay = Math.min(1000 * Math.pow(2, reconnectAttempt), 30000);
+        const jitter = Math.random() * 1000;
+        const delay = baseDelay + jitter;
+        reconnectAttempt++;
+
+        console.log(
+          `[WS] Closed. Reconnecting in ${Math.round(delay)}ms... (Attempt ${reconnectAttempt})`,
+        );
+        reconnectTimer = setTimeout(() => {
+          get().connect(roomCode, playerId);
+        }, delay);
+      } else {
+        set({ error: "Connection lost. Please refresh." });
       }
     };
 
     newWs.onerror = (error) => {
-      console.error("WebSocket error:", error);
+      console.error("[WS] Error:", error);
     };
 
     set({ ws: newWs });
@@ -358,11 +335,10 @@ export const useWebSocketStore = create<WebSocketState>((set, get) => ({
   disconnect: () => {
     const { ws } = get();
     if (ws) {
+      intentionalDisconnect = true;
       stopHeartbeat();
-      // Set a strict error string or flag to prevent auto-reconnect
-      set({ error: "Disconnected manually" });
       ws.close();
-      set({ ws: null, isConnected: false, isConnecting: false });
+      set({ ws: null, isConnected: false, isConnecting: false, error: null });
     }
   },
 
@@ -371,7 +347,7 @@ export const useWebSocketStore = create<WebSocketState>((set, get) => ({
     if (ws?.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(data));
     } else {
-      console.warn("WebSocket is not connected");
+      console.warn("[WS] Not connected, dropping message:", data.type);
     }
   },
 }));

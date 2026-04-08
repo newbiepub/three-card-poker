@@ -60,15 +60,11 @@ Features:
 Manages active game state:
 
 ```typescript
-interface GameStore {
-  currentGame: Game | null;
-  playerCards: Card[];
-  opponentCards: Card[];
-  communityCards: Card[];
-  pot: number;
-  currentTurn: string | null;
-  gamePhase: "waiting" | "dealing" | "betting" | "showdown" | "finished";
-  // Actions...
+interface GamePlayer extends Player {
+  // ...
+  roundScore: number;     // Points change in current round (+5/-5)
+  cumulatedScore: number; // Cumulative score within current session (SSOT for UI)
+  totalScore: number;     // Carrier score from DB (historical)
 }
 ```
 
@@ -76,8 +72,8 @@ Features:
 
 - Card management
 - Game phase tracking
-- Pot management
-- Turn tracking
+- Session score synchronization (prioritizing WebSocket source)
+- Use `cumulatedScore` for in-game leaderboards to ensure real-time accuracy.
 
 ## Usage Examples
 

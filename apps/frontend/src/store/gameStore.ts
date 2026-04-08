@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Player, Card, Pile, StickerMeta } from "@three-card-poker/shared";
+import type { Player, Card, Pile } from "@three-card-poker/shared";
 
 export interface GamePlayer extends Player {
   hand: Card[];
@@ -20,7 +20,7 @@ interface GameState {
   showRoundResult: boolean;
   showFinalResult: boolean;
   piles: Pile[];
-  stickers: (StickerMeta & { id: string })[];
+  stickers: { id: string; playerId: string; sticker: string; timestamp: number }[];
 
   setGameState: (status: GameState["gameStatus"]) => void;
   setCurrentRound: (round: number) => void;

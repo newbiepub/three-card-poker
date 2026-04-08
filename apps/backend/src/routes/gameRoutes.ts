@@ -23,7 +23,7 @@ app.post("/players/register", async (c) => {
       stats,
       isNewPlayer,
     });
-  } catch (error) {
+  } catch {
     return c.json({ error: "Failed to register player" }, 500);
   }
 });
@@ -40,7 +40,7 @@ app.get("/players/verify/:playerId", async (c) => {
     }
 
     return c.json({ exists: true, player });
-  } catch (error) {
+  } catch {
     return c.json({ error: "Failed to verify player" }, 500);
   }
 });
@@ -73,7 +73,7 @@ app.post("/rooms/create", async (c) => {
       session,
       host,
     });
-  } catch (error) {
+  } catch {
     return c.json({ error: "Failed to create room" }, 500);
   }
 });
@@ -123,7 +123,7 @@ app.post("/rooms/join", async (c) => {
       player,
       isHost: room.hostId === player.id,
     });
-  } catch (error) {
+  } catch {
     return c.json({ error: "Failed to join room" }, 500);
   }
 });
@@ -183,7 +183,7 @@ app.get("/sessions/:sessionId/snapshot/:roomId", async (c) => {
     );
     if (!snapshot) return c.json({ error: "Session not found" }, 404);
     return c.json({ snapshot });
-  } catch (e) {
+  } catch {
     return c.json({ error: "Failed to create snapshot" }, 500);
   }
 });
@@ -191,7 +191,7 @@ app.get("/sessions/:sessionId/snapshot/:roomId", async (c) => {
 // Publish score for a player
 app.post("/sessions/:sessionId/publish-score", async (c) => {
   const sessionId = c.req.param("sessionId");
-  const { playerId, score, roundNumber } = await c.req.json();
+  const { playerId, score, roundNumber, cards } = await c.req.json();
 
   try {
     // Get session
@@ -206,13 +206,14 @@ app.post("/sessions/:sessionId/publish-score", async (c) => {
       playerId,
       roundNumber || session.currentRound,
       score,
+      cards,
     );
 
     return c.json({
       success: true,
       scoreRecord,
     });
-  } catch (error) {
+  } catch {
     return c.json({ error: "Failed to publish score" }, 500);
   }
 });
@@ -281,13 +282,24 @@ app.post("/sessions/:sessionId/next-round", async (c) => {
     }
 
     const allScores = await SessionService.getAllPlayerScores(sessionId);
+    const latestScoreByPlayer = new Map<string, (typeof allScores)[number]>();
+    for (const score of allScores) {
+      const existing = latestScoreByPlayer.get(score.playerId);
+      if (!existing || score.roundNumber > existing.roundNumber) {
+        latestScoreByPlayer.set(score.playerId, score);
+      }
+    }
+
+    const latestScoresArray = Array.from(latestScoreByPlayer.values()).sort(
+      (a, b) => b.cumulativeScore - a.cumulativeScore,
+    );
 
     // Release lock
     nextRoundLocks.delete(sessionId);
 
     return c.json({
       session: updatedSession,
-      allScores,
+      allScores: latestScoresArray,
     });
   } catch (error) {
     console.error("Error updating round:", error);
@@ -345,7 +357,7 @@ app.get("/sessions/:sessionId/state", async (c) => {
       })),
       allScores: latestScoresArray,
     });
-  } catch (error) {
+  } catch {
     return c.json({ error: "Failed to get session state" }, 500);
   }
 });

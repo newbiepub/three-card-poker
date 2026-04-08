@@ -217,7 +217,15 @@ POST /api/sessions/:sessionId/start
 POST /api/sessions/:sessionId/next-round
 {
   hostId: string;
+  expectedCurrentRound: number;
 }
+
+Response: {
+  session: Session;
+  allScores: CumulativeScore[]; // Filtered: only latest score per player
+}
+
+NOTE: While the REST response contains scores, the frontend should prioritize syncing via the WebSocket broadcast to avoid race conditions.
 
 POST /api/sessions/:sessionId/reset
 {

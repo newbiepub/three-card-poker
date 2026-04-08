@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "../ui/card";
 import { Badge } from "../ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { Users, Crown, Play, X } from "lucide-react";
 import type { Room, Session } from "@/types";
 import type { Player } from "@three-card-poker/shared";
@@ -33,6 +34,7 @@ export function RoomLobby({
   onLeaveRoom,
   onKickPlayer,
 }: RoomLobbyProps) {
+
   return (
     <div className="min-h-screen bg-background p-4 crt-scanlines">
       <div className="max-w-4xl mx-auto space-y-6">
@@ -72,30 +74,37 @@ export function RoomLobby({
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                     layout
-                    className={`flex items-center justify-between p-3 rounded-lg border transition-all duration-300 ${
+                    className={`flex items-center justify-between gap-2 p-3 rounded-lg border transition-all duration-300 ${
                       player.id === currentUserId
                         ? "border-primary bg-primary/10 neon-border"
                         : "border-border hover:border-primary/50"
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 shrink-0 rounded-full bg-secondary flex items-center justify-center">
                         <span className="text-sm font-bold font-body">
                           {player.name.charAt(0).toUpperCase()}
                         </span>
                       </div>
-                      <div>
-                        <p className="font-body font-semibold">
-                          {player.name}
-                          {player.id === currentUserId && (
-                            <span className="ml-2 text-sm text-muted-foreground">
-                              (You)
-                            </span>
-                          )}
-                        </p>
+                      <div className="min-w-0">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <p className="font-body font-semibold truncate text-left cursor-default">
+                              {player.name}
+                              {player.id === currentUserId && (
+                                <span className="ml-2 text-sm text-muted-foreground">
+                                  (You)
+                                </span>
+                              )}
+                            </p>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="font-body">{player.name}</p>
+                          </TooltipContent>
+                        </Tooltip>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                       {player.id === room.hostId && (
                         <Badge variant="secondary" className="font-body">
                           <Crown className="w-3 h-3 mr-1" />
